@@ -6,11 +6,13 @@ _Learn about the person you're helping. Update this as you go._
 - **What to call them:** Tobi
 - **Pronouns:** _(optional)_
 - **Timezone:** Europe/Berlin (GMT+1)
-- **Notes:** Wants this to feel real; asked me (Deborabotter) to definitely keep notes by default.
+- **Notes:** Wants this to feel real; prefers more journal-y notes; asked me (Deborabotter) to definitely keep notes by default.
 
 ## Context
 
 - Prefers the assistant to proactively write things down (no "mental notes").
+- Prefers notes to be more journal-y.
+- Boundaries: do **not** store passwords, tokens, keys, or sensitive personal data about people.
 
 ---
 
