@@ -49,6 +49,43 @@ Rules are identified by `RULE-[Category]-[Number]`.
   ELSE append event to event_stream and return status("EVENT_INGESTED")
   ```
 
+### RULE-CORE-004: Event Type Requirement
+
+- **Feature:** Event Ingestion
+- **Needs:** `event_type` in the event payload
+- **Edge Case:** `event_type` is missing
+- **Business Rule:**
+  ```
+  IF event_type is missing
+  THEN reject event and return error("MISSING_EVENT_TYPE")
+  ELSE process event
+  ```
+
+### RULE-CORE-005: Event Type Validation
+
+- **Feature:** Event Ingestion
+- **Needs:** `event_type`, list of valid types
+  (`intent|action|observation|decision|approval_requested|approval_resolved|error|summary`)
+- **Edge Case:** `event_type` is not in the list of valid types
+- **Business Rule:**
+  ```
+  IF event_type not in valid_event_types
+  THEN reject event and return error("INVALID_EVENT_TYPE")
+  ELSE process event
+  ```
+
+### RULE-CORE-006: Title and Details Requirement
+
+- **Feature:** Timeline Readability
+- **Needs:** `title`, `details`
+- **Edge Case:** `title` or `details` is missing
+- **Business Rule:**
+  ```
+  IF title is missing OR details is missing
+  THEN reject event and return error("MISSING_TIMELINE_FIELDS")
+  ELSE process event
+  ```
+
 ---
 
 ## 🟡 Risk Labeling
@@ -165,6 +202,20 @@ Rules are identified by `RULE-[Category]-[Number]`.
   THEN set workflow_status="RUNNING" and emit approval_approved
   ELSE handling rejection or valid states
   ```
+
+### RULE-GATE-007: Approval State Machine
+
+- **Feature:** Approval Lifecycle
+- **Needs:** Current `approval.status`, requested transition
+- **Edge Case:** Invalid state transition (e.g., `not_required` → `approved`,
+  `rejected` → `approved`)
+- **Business Rule:**
+  ```
+  IF requested transition is not in valid_transitions
+  THEN reject and return error("INVALID_APPROVAL_TRANSITION")
+  ELSE apply transition
+  ```
+  Valid transitions: `not_required` → `pending` → `approved|rejected`
 
 ---
 
