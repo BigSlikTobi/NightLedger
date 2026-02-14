@@ -1,0 +1,9 @@
+flowchart LR
+    A[Agent Emits Event] --> B[Append-Only Event Stream]
+    B --> C[Journal Projection]
+    C --> D{Risky Event?}
+    D -- No --> H[Continue Execution]
+    D -- Yes --> E[Pause Runtime]
+    E --> F[Human Approval UI]
+    F --> G[Approval Event Recorded]
+    G --> H
