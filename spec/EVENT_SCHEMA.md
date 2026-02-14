@@ -36,4 +36,5 @@
 ## Notes
 - `title` + `details` are required for readable timeline output.
 - `confidence` is optional but recommended.
+- `timestamp` must include timezone information and is normalized to UTC.
 - `approval.status` must transition through a valid state machine.
