@@ -35,3 +35,7 @@ Ship one real end-to-end workflow:
 - Structured events under the hood
 - Safety gates for irreversible/risky actions
 - Minimal ceremony, fast iteration
+
+## Hackathon
+
+See `docs/HACKATHON.md` for the Clawbot-created hackathon charter, motivation, evidence trigger, and Week-1 goals.
