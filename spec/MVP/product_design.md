@@ -67,7 +67,7 @@ may continue.
 ### 📦 Responsibilities
 
 - Detect risky event types
-- Evaluate risk category rules
+- Evaluate risk level rules (`risk_level`)
 - Validate required fields (evidence, confidence, context)
 - Trigger `approval_required` state
 
@@ -90,7 +90,7 @@ Transforms structured events into human-readable state.
 - Project raw events into journal entries
 - Create risk labels
 - Generate narrative summaries
-- Compute trust/confidence signals
+- Compute trust/confidence signals (`confidence`)
 - Render timeline states (`running`, `paused`, `approved`, `rejected`,
   `completed`)
 
@@ -110,181 +110,19 @@ This layer is responsible for experience — not enforcement.
 
 # PART 2 — Business Rules
 
-## 📐 Rule Format (Strict)
+> [!IMPORTANT]
+> The formal business rules have been moved to a strictly versioned
+> specification file. See [BUSINESS_RULES.md](../BUSINESS_RULES.md) for the
+> source of truth.
 
-Every feature defines **exactly one business rule** in this format:
+## 📚 Rule Reference
 
-```
-IF ... THEN ... ELSE ...
-```
-
-If multiple edge cases exist, they are expressed as a prioritized chain:
-
-```
-IF ...
-ELSE IF ...
-ELSE ...
-```
-
----
-
-# 🔴 Feature: Append-only Event Stream
-
-### Required Fields
-
-- `run_id`
-- `event_id`
-- `timestamp`
-- `event_type`
-
-### Edge Cases
-
-- `run_id` missing
-- `event_id` duplicated within run
-- timestamp out-of-order
-
-### Business Rule
-
-```
-IF run_id is missing
-THEN reject event and return error("MISSING_RUN_ID")
-
-ELSE IF event_id is duplicated within run_id
-THEN reject event and return error("DUPLICATE_EVENT_ID")
-
-ELSE IF timestamp < last_event_timestamp
-THEN append event and mark integrity_warning=true
-
-ELSE append event to event_stream and return status("EVENT_INGESTED")
-```
+| Category              | Description                                             | Rules                              |
+| --------------------- | ------------------------------------------------------- | ---------------------------------- |
+| **🔴 Core Integrity** | Event stream validation (Schema, timestamps, integrity) | `RULE-CORE-001` to `RULE-CORE-009` |
+| **🟡 Risk Labeling**  | Risk assessment logic and categorization                | `RULE-RISK-001` to `RULE-RISK-004` |
+| **🟠 Approval Gate**  | Human-in-the-loop governance & state transitions        | `RULE-GATE-001` to `RULE-GATE-009` |
+| **🔵 Confidence**     | Confidence scoring and threshold escalation             | `RULE-CONF-001` to `RULE-CONF-005` |
+| **🟢 Visualization**  | UX rules for heatmaps and risk displays                 | `RULE-VIS-001` to `RULE-VIS-002`   |
 
 ---
-
-# 🟡 Feature: Risk Labeling
-
-### Required Fields
-
-- `workflow_id`
-- `risk_name`
-- `risk_category`
-- `event_type`
-
-### Edge Cases
-
-- `workflow_id` empty
-- `risk_category` missing
-- `event_type` not in risk catalog
-
-### Business Rule
-
-```
-IF workflow_id is empty
-THEN reject event and return error("MISSING_WORKFLOW")
-
-ELSE IF risk_category is missing
-THEN set risk_category="UNCLASSIFIED" and continue
-
-ELSE IF event_type not in risk catalog
-THEN set requires_approval=false and attach risk_label="NONE"
-
-ELSE attach risk_label={risk_name,risk_category}
-and set requires_approval=true
-```
-
----
-
-# 🟠 Feature: Approval Gate
-
-### Required Fields
-
-- `requires_approval`
-- `workflow_status`
-- `approval_status` (APPROVED | REJECTED)
-- `approver_id`
-- `approval_timestamp`
-
-### Edge Cases
-
-- Approval submitted while none pending
-- Duplicate approval
-- Approval timeout
-
-### Business Rule
-
-```
-IF requires_approval=true AND workflow_status != "PAUSED"
-THEN set workflow_status="PAUSED" and emit approval_request
-
-ELSE IF approval submitted AND workflow_status != "PAUSED"
-THEN return error("NO_PENDING_APPROVAL")
-
-ELSE IF approval already resolved
-THEN return error("DUPLICATE_APPROVAL")
-
-ELSE IF approval not received within TIMEOUT
-THEN set workflow_status="EXPIRED" and emit approval_expired
-
-ELSE IF approval_status="REJECTED"
-THEN set workflow_status="STOPPED" and emit approval_rejected
-
-ELSE set workflow_status="RUNNING" and emit approval_approved
-```
-
----
-
-# 🔵 Feature: Confidence Score
-
-### Required Fields
-
-- `confidence_value` (0..1)
-- `risk_category`
-
-### Edge Cases
-
-- Missing value
-- Out-of-range value
-- Below threshold for non-low risk
-
-### Business Rule
-
-```
-IF confidence_value is missing
-THEN set confidence_value=0.5
-
-ELSE IF confidence_value < 0
-THEN set confidence_value=0
-
-ELSE IF confidence_value > 1
-THEN set confidence_value=1
-
-ELSE IF confidence_value < THRESHOLD AND risk_category != "LOW"
-THEN escalate risk_category="MEDIUM"
-and set requires_approval=true
-
-ELSE attach confidence_value and continue
-```
-
----
-
-# 🟢 Feature: Risk Heatmap Visualization
-
-### Required Fields
-
-- `workflow_id`
-- `risk_category` per event
-- `timestamp`
-
-### Edge Case
-
-- No risk events exist
-
-### Business Rule
-
-```
-IF no events have risk_category != "NONE"
-THEN show empty_heatmap_state
-
-ELSE aggregate risk counts by risk_category
-(and optionally by time bucket)
-and render heatmap
-```
