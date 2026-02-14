@@ -1,8 +1,8 @@
-# Operator Journal
+# NightLedger
 
 Autonomy with receipts.
 
-Operator Journal is a lightweight system that makes agent work auditable and trustworthy: every run becomes a clear human-readable journal entry with evidence, confidence, and explicit approval state.
+NightLedger is a lightweight system that makes agent work auditable and trustworthy: every run becomes a clear human-readable journal entry with evidence, confidence, and explicit approval state.
 
 ## Week 1 Goal
 
