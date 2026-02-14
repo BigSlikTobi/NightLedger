@@ -1,0 +1,13 @@
+graph LR
+    A[Agent Runtime] --> B[Integration Layer]
+    B --> C[("Append-Only Event Store")]
+    C --> D[Validation Layer]
+    D -->|State Changes| C
+    C --> E[Representation Layer]
+    E --> F[UI / Timeline / Heatmap]
+
+    %% Styling
+    style B fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style C fill:#f9f,stroke:#333,stroke-width:2px
+    style D fill:#fff4dd,stroke:#d4a017,stroke-width:2px
+    style E fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
