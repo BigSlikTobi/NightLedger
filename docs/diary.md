@@ -8,6 +8,102 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-15: Issue #33 — Journal Projection Fixture Coverage (5-Round Big Slik Cycle)
+
+### 🎯 Objective
+
+Add focused unit coverage for journal projection behavior using realistic run
+fixtures, including deterministic ordering guarantees, approval transition
+rendering, and traceability/evidence linkage assertions.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — Baseline Fixture Mapping + Traceability
+
+1. **Pattern Investigation:** Existing projector tests validated specific
+   fields, but did not provide a dedicated fixture-driven event-type mapping
+   sweep with per-entry payload linkage checks.
+2. **Failing Tests:** Added
+   `test_round1_projection_fixture_maps_event_types_and_traceability` in
+   `tests/test_journal_projection.py` and initially left fixture helper missing
+   to force a red test.
+3. **Implementation:** Implemented `_happy_path_run_fixture` and `_stored_event`
+   helpers to build realistic event streams.
+4. **Verification:** Round 1 targeted test passed.
+5. **Outcome/Learning:** Baseline fixture coverage now validates event-type
+   mapping plus raw payload traceability for every entry.
+
+### Round 2 — Out-of-Order Ingestion Determinism
+
+1. **Pattern Investigation:** Issue acceptance required deterministic behavior
+   when ingestion order does not match timestamp order.
+2. **Failing Tests:** Added
+   `test_round2_projection_fixture_is_deterministic_for_out_of_order_ingestion`
+   with missing helper first to force failure.
+3. **Implementation:** Added `_projected_entry_ids_for_out_of_order_ingestion`
+   plus reusable `_event_payload` builder using
+   `InMemoryAppendOnlyEventStore`.
+4. **Verification:** Round 1-2 targeted tests passed.
+5. **Outcome/Learning:** Projection ordering is now locked to deterministic
+   sorted retrieval from append-only storage in realistic ingestion scenarios.
+
+### Round 3 — Same-Timestamp Tie Determinism
+
+1. **Pattern Investigation:** Deterministic ties at identical timestamps were
+   not explicitly asserted in dedicated fixture tests.
+2. **Failing Tests:** Added
+   `test_round3_projection_fixture_is_deterministic_for_same_timestamp_ties`
+   and intentionally failed on missing helper.
+3. **Implementation:** Added `_projected_entry_ids_for_same_timestamp_ties`
+   fixture helper.
+4. **Verification:** Round 1-3 targeted tests passed.
+5. **Outcome/Learning:** Tiebreak behavior is now explicitly covered as stable
+   insertion-sequence ordering.
+
+### Round 4 — Approval Pending/Resolved Rendering
+
+1. **Pattern Investigation:** Approval rendering existed in prior tests, but
+   issue #33 asked for fixture-based coverage focused on projection behavior.
+2. **Failing Tests:** Added
+   `test_round4_projection_fixture_renders_approval_pending_and_resolved_entries`
+   with missing helper to force red.
+3. **Implementation:** Added `_approval_flow_fixture_projection` and extended
+   `_event_payload` to model approval metadata transitions.
+4. **Verification:** Round 1-4 targeted tests passed.
+5. **Outcome/Learning:** Fixture coverage now asserts both required and resolved
+   approval rendering, including resolver identity and decision semantics.
+
+### Round 5 — Edge Fixture Evidence + Raw Linkage Audit
+
+1. **Pattern Investigation:** Acceptance required evidence/raw linkage
+   assertions across every fixture entry, including edge paths.
+2. **Failing Tests:** Added
+   `test_round5_projection_edge_fixture_preserves_evidence_and_raw_linkage`
+   with missing helper to force red.
+3. **Implementation:** Added `_edge_path_projection_fixture` using out-of-order
+   ingestion, pending approval, and rejected resolution flow.
+4. **Verification:** `tests/test_journal_projection.py` passed end-to-end.
+5. **Outcome/Learning:** Every edge fixture entry now asserts payload
+   traceability and evidence references, with integrity warning and rejection
+   semantics explicitly validated.
+
+### ✅ Final Audit Summary
+
+- **Issue-vs-implementation check:** Acceptance criteria satisfied in dedicated
+  unit coverage:
+  deterministic ordering (out-of-order + tie), approval-required/resolved
+  rendering, and evidence/raw linkage assertions.
+- **Code hygiene:** Added reusable fixture helpers to keep scenarios readable
+  and avoid duplicated payload construction.
+- **Validation completed:**
+  - `./.venv/bin/pytest -q tests/test_journal_projection.py`
+  - `./.venv/bin/pytest -q tests/test_journal_projection.py tests/test_journal_projection_service.py`
+- **Environment limitation:** Full-suite run
+  `./.venv/bin/pytest -q` is currently blocked in this sandbox because
+  `httpx` is unavailable offline during dependency install.
+- **Issue #33 readiness decision:** **Ready** for review; fixture-driven
+  projection coverage added with deterministic and traceability guarantees.
+
 ## 🗓️ 2026-02-15: Issue #32 — Journal Endpoint Wiring (5-Round Big Slik Cycle)
 
 ### 🎯 Objective
