@@ -26,6 +26,12 @@ This maps MVC onto NightLedger's separation-of-concerns model:
 - Governance Layer: service logic (no UI concerns).
 - Representation Layer: presenter/projection modules (read models only).
 
+## Journal Projection Ownership
+- Journal projection ownership is in the representation layer.
+- Projection modules translate immutable events into deterministic read models.
+- Representation code must not perform governance policy checks or state enforcement.
+- Governance services remain the only place that evaluates approval/risk transitions.
+
 ## Data Shape
 - Event stream per run (`run_id` partition)
 - Derived journal projection for fast UI reads
