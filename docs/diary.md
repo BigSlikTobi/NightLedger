@@ -8,6 +8,92 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-15: Issue #31 — Journal Projection Service (5-Round Big Slik Cycle)
+
+### 🎯 Objective
+
+Implement a dedicated representation-layer journal projection service that
+transforms ordered `StoredEvent` inputs into deterministic, readable timeline
+entries with traceability, evidence, and approval context.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — Baseline Projection Service
+
+1. **Pattern Investigation:** Confirmed there was no
+   `journal_projection_service` and no reusable projection model for the
+   journal endpoint.
+2. **Failing Tests:** Added `test_round1_project_run_journal_maps_baseline_readable_entry`
+   in `tests/test_journal_projection_service.py`.
+3. **Implementation:** Added
+   `src/nightledger_api/services/journal_projection_service.py` with a pure
+   `project_run_journal()` transformation and typed dataclasses.
+4. **Verification:** Targeted test passed, then full suite passed.
+5. **Outcome/Learning:** Baseline deterministic readable entry mapping and
+   payload linkage in place.
+
+### Round 2 — Evidence Traceability
+
+1. **Pattern Investigation:** Baseline output lacked explicit evidence
+   references.
+2. **Failing Tests:** Added
+   `test_round2_project_run_journal_includes_evidence_references`.
+3. **Implementation:** Projected `evidence_refs` from source event evidence
+   entries in deterministic source order.
+4. **Verification:** Targeted test passed, then full suite passed.
+5. **Outcome/Learning:** Journal entries now surface evidence pointers directly
+   for auditability.
+
+### Round 3 — Approval Transition Visibility
+
+1. **Pattern Investigation:** Approval transitions were present only implicitly
+   in `approval_context`.
+2. **Failing Tests:** Added
+   `test_round3_project_run_journal_surfaces_approval_transition_indicators`.
+3. **Implementation:** Added `approval_indicator` projection with:
+   `is_approval_required`, `is_approval_resolved`, and `decision`.
+4. **Verification:** Targeted test passed, then full suite passed.
+5. **Outcome/Learning:** Approval-required and approval-resolved transitions are
+   now explicit in projected entries.
+
+### Round 4 — Structured Metadata Projection
+
+1. **Pattern Investigation:** Entry output still lacked a stable metadata block
+   for machine-readable context.
+2. **Failing Tests:** Added
+   `test_round4_project_run_journal_includes_structured_metadata_block`.
+3. **Implementation:** Added `metadata` per entry:
+   `actor`, `confidence`, `risk_level`, `integrity_warning`.
+4. **Verification:** Targeted test passed, then full suite passed.
+5. **Outcome/Learning:** Projection schema now contains both narrative fields
+   and compact structured context.
+
+### Round 5 — Determinism Guard (Fail Loudly)
+
+1. **Pattern Investigation:** Determinism could drift if callers pass unordered
+   event streams.
+2. **Failing Tests:** Added
+   `test_round5_project_run_journal_fails_loud_on_unordered_input`.
+3. **Implementation:** Added explicit unordered input detection and raised
+   `InconsistentRunStateError` with code `UNORDERED_EVENT_STREAM`.
+4. **Verification:** Targeted test passed, then projector suite passed, then
+   full suite passed.
+5. **Outcome/Learning:** Projector is now side-effect-free, deterministic, and
+   fail-loud on invalid ordering assumptions.
+
+### ✅ Final Audit Summary
+
+- **Docs first:** `docs/ARCHITECTURE.md` updated to declare runtime journal
+  projector ownership in the representation layer.
+- **Code delivered:** Pure projection service with typed projection models and
+  deterministic transformations.
+- **Coverage:** Added dedicated projector tests in
+  `tests/test_journal_projection_service.py`.
+- **Final verification:** `106` tests passing (`./.venv/bin/pytest -q`).
+- **Issue #31 readiness decision:** **Ready** for merge; acceptance criteria met
+  for deterministic output, traceability, evidence projection, and approval
+  transition representation.
+
 ## 2026-02-15 — Issue #6 Journal Timeline Refactor (The Big Slik Way)
 
 Today was intense, and honestly useful.
