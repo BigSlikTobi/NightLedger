@@ -34,6 +34,10 @@ class EventStore(Protocol):
         """
         raise NotImplementedError
 
+    def list_all(self) -> list[StoredEvent]:
+        """List all events across runs, ordered by timestamp (ascending)."""
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
 class _StoredRecord:
@@ -88,6 +92,15 @@ class InMemoryAppendOnlyEventStore:
         ordered = sorted(records, key=lambda record: (record.timestamp, record.sequence))
         return [self._to_stored_event(record) for record in ordered]
 
+    def list_all(self) -> list[StoredEvent]:
+        records = [
+            record
+            for run_records in self._run_records_index.values()
+            for record in run_records
+        ]
+        ordered = sorted(records, key=lambda record: (record.timestamp, record.sequence))
+        return [self._to_stored_event(record) for record in ordered]
+
     def _to_stored_event(self, record: _StoredRecord) -> StoredEvent:
         return StoredEvent(
             id=record.id,
@@ -96,6 +109,5 @@ class InMemoryAppendOnlyEventStore:
             payload=deepcopy(record.payload),
             integrity_warning=record.integrity_warning,
         )
-
 
 

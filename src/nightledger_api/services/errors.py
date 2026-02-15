@@ -52,3 +52,27 @@ class InconsistentRunStateError(Exception):
         self.detail_code = detail_code
         self.detail_type = detail_type
         super().__init__(detail_message)
+
+
+class ApprovalNotFoundError(Exception):
+    def __init__(self, event_id: str) -> None:
+        self.event_id = event_id
+        super().__init__(f"Approval target event '{event_id}' was not found")
+
+
+class AmbiguousEventIdError(Exception):
+    def __init__(self, event_id: str) -> None:
+        self.event_id = event_id
+        super().__init__(f"Event ID '{event_id}' exists in multiple runs")
+
+
+class NoPendingApprovalError(Exception):
+    def __init__(self, event_id: str) -> None:
+        self.event_id = event_id
+        super().__init__(f"Event '{event_id}' is not the currently pending approval")
+
+
+class DuplicateApprovalError(Exception):
+    def __init__(self, event_id: str) -> None:
+        self.event_id = event_id
+        super().__init__(f"Approval for event '{event_id}' has already been resolved")

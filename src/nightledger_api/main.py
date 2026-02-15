@@ -3,16 +3,24 @@ from fastapi.responses import JSONResponse
 
 from nightledger_api.controllers.events_controller import router as events_router
 from nightledger_api.presenters.error_presenter import (
+    present_ambiguous_event_id_error,
+    present_approval_not_found_error,
+    present_duplicate_approval_error,
     present_duplicate_event_error,
     present_inconsistent_run_state_error,
+    present_no_pending_approval_error,
     present_run_not_found_error,
     present_schema_validation_error,
     present_storage_read_error,
     present_storage_write_error,
 )
 from nightledger_api.services.errors import (
+    AmbiguousEventIdError,
+    ApprovalNotFoundError,
+    DuplicateApprovalError,
     DuplicateEventError,
     InconsistentRunStateError,
+    NoPendingApprovalError,
     RunNotFoundError,
     SchemaValidationError,
     StorageReadError,
@@ -87,4 +95,48 @@ async def handle_inconsistent_run_state_error(
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
         content=present_inconsistent_run_state_error(exc),
+    )
+
+
+@app.exception_handler(ApprovalNotFoundError)
+async def handle_approval_not_found_error(
+    request: Request, exc: ApprovalNotFoundError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content=present_approval_not_found_error(exc),
+    )
+
+
+@app.exception_handler(AmbiguousEventIdError)
+async def handle_ambiguous_event_id_error(
+    request: Request, exc: AmbiguousEventIdError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=present_ambiguous_event_id_error(exc),
+    )
+
+
+@app.exception_handler(NoPendingApprovalError)
+async def handle_no_pending_approval_error(
+    request: Request, exc: NoPendingApprovalError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=present_no_pending_approval_error(exc),
+    )
+
+
+@app.exception_handler(DuplicateApprovalError)
+async def handle_duplicate_approval_error(
+    request: Request, exc: DuplicateApprovalError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=present_duplicate_approval_error(exc),
     )
