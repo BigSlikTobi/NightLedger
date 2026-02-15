@@ -23,6 +23,35 @@ header {
   margin-bottom: 20px;
 }
 
+.pending {
+  margin-bottom: 20px;
+}
+
+.pending-list {
+  display: grid;
+  gap: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+button {
+  border: 1px solid #475569;
+  background: #1e293b;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .timeline {
   list-style: none;
   padding: 0;

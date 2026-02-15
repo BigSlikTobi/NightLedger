@@ -2,6 +2,8 @@ export function createTimelineController({
   runId,
   getDemoEvents,
   getJournalEvents,
+  listPendingApprovals,
+  resolveApproval,
   onState,
 }) {
   const state = {
@@ -9,6 +11,10 @@ export function createTimelineController({
     status: "idle",
     error: "",
     events: [],
+    pendingStatus: "idle",
+    pendingError: "",
+    pendingApprovals: [],
+    pendingSubmissionByEventId: {},
   };
 
   function emit() {
@@ -31,5 +37,37 @@ export function createTimelineController({
     }
   }
 
-  return { state, load };
+  async function loadPendingApprovals() {
+    state.pendingStatus = "loading";
+    state.pendingError = "";
+    emit();
+
+    try {
+      state.pendingApprovals = await listPendingApprovals();
+      state.pendingStatus = "success";
+      emit();
+    } catch (err) {
+      state.pendingStatus = "error";
+      state.pendingError = err?.message ?? "Unknown error";
+      emit();
+    }
+  }
+
+  async function submitApprovalDecision(eventId, decision) {
+    if (state.pendingSubmissionByEventId[eventId]) return;
+
+    state.pendingSubmissionByEventId[eventId] = true;
+    emit();
+
+    try {
+      await resolveApproval(eventId, decision);
+      state.pendingApprovals = state.pendingApprovals.filter((item) => item.event_id !== eventId);
+      emit();
+    } finally {
+      state.pendingSubmissionByEventId[eventId] = false;
+      emit();
+    }
+  }
+
+  return { state, load, loadPendingApprovals, submitApprovalDecision };
 }

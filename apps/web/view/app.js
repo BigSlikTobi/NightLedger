@@ -16,6 +16,25 @@ function fetchJournalEvents(runId) {
   });
 }
 
+function fetchPendingApprovals() {
+  return fetch("/v1/approvals/pending").then(async (res) => {
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    const body = await res.json();
+    return body.items ?? body.approvals ?? body.pending ?? [];
+  });
+}
+
+function postApprovalDecision(eventId, decision) {
+  return fetch(`/v1/approvals/${encodeURIComponent(eventId)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ decision }),
+  }).then(async (res) => {
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    return res.json().catch(() => ({}));
+  });
+}
+
 createApp({
   setup() {
     const state = reactive({
@@ -23,6 +42,10 @@ createApp({
       status: "idle",
       error: "",
       events: [],
+      pendingStatus: "idle",
+      pendingError: "",
+      pendingApprovals: [],
+      pendingSubmissionByEventId: {},
     });
 
     const cards = computed(() => toTimelineCards(state.events));
@@ -35,16 +58,31 @@ createApp({
         return MOCK_EVENTS;
       },
       getJournalEvents: fetchJournalEvents,
+      listPendingApprovals: fetchPendingApprovals,
+      resolveApproval: postApprovalDecision,
       onState: (next) => {
         state.status = next.status;
         state.error = next.error;
         state.events = next.events;
+        state.pendingStatus = next.pendingStatus;
+        state.pendingError = next.pendingError;
+        state.pendingApprovals = next.pendingApprovals;
+        state.pendingSubmissionByEventId = next.pendingSubmissionByEventId;
       },
     });
 
     controller.load();
+    controller.loadPendingApprovals();
 
-    return { state, cards, isDemo };
+    function onApprove(eventId) {
+      return controller.submitApprovalDecision(eventId, "approved");
+    }
+
+    function onReject(eventId) {
+      return controller.submitApprovalDecision(eventId, "rejected");
+    }
+
+    return { state, cards, isDemo, onApprove, onReject };
   },
   template: `
     <main>
@@ -59,9 +97,37 @@ createApp({
         Could not load journal timeline. {{ state.error }}
       </div>
 
-      <div v-else-if="cards.length === 0" class="state">No journal events for this run yet.</div>
+      <section class="pending">
+        <h2>Pending Approvals</h2>
+        <div v-if="state.pendingStatus === 'loading'" class="state">Loading pending approvals…</div>
+        <div v-else-if="state.pendingStatus === 'error'" class="state state--error">
+          Could not load pending approvals. {{ state.pendingError }}
+        </div>
+        <div v-else-if="state.pendingApprovals.length === 0" class="state">No pending approvals.</div>
+        <div v-else class="pending-list">
+          <article v-for="item in state.pendingApprovals" :key="item.event_id" class="card card--approval">
+            <div class="card__head">
+              <h3>{{ item.title || item.event_id }}</h3>
+              <span class="pill">risk: {{ (item.risk_level || 'unknown').toUpperCase() }}</span>
+            </div>
+            <p>{{ item.summary || item.details || 'Approval required.' }}</p>
+            <div class="actions">
+              <button
+                @click="onApprove(item.event_id)"
+                :disabled="state.pendingSubmissionByEventId[item.event_id]"
+              >Approve</button>
+              <button
+                @click="onReject(item.event_id)"
+                :disabled="state.pendingSubmissionByEventId[item.event_id]"
+              >Reject</button>
+            </div>
+          </article>
+        </div>
+      </section>
 
-      <ol v-else class="timeline">
+      <div v-if="state.status === 'success' && cards.length === 0" class="state">No journal events for this run yet.</div>
+
+      <ol v-if="state.status === 'success' && cards.length > 0" class="timeline">
         <li
           v-for="card in cards"
           :key="card.id"
