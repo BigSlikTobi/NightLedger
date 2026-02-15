@@ -108,6 +108,8 @@ def get_run_journal(
     run_id: str, store: EventStore = Depends(get_event_store)
 ) -> dict[str, Any]:
     events = store.list_by_run_id(run_id)
+    if not events:
+        raise RunNotFoundError(run_id=run_id)
     projection = project_run_journal(run_id=run_id, events=events)
     return projection.to_dict()
 

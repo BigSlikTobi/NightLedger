@@ -121,3 +121,15 @@ def test_round1_get_run_journal_returns_projection_for_known_run() -> None:
             }
         ],
     }
+
+
+def test_round2_get_run_journal_returns_not_found_for_unknown_run() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    response = client.get("/v1/runs/run_journal_unknown/journal")
+
+    assert response.status_code == 404
+    body = response.json()
+    assert body["error"]["code"] == "RUN_NOT_FOUND"
+    assert body["error"]["details"][0]["path"] == "run_id"
