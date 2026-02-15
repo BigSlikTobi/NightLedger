@@ -342,6 +342,138 @@ Storage read error response (v0 draft):
 }
 ```
 
+Example — pending approval flow:
+
+```json
+{
+  "run_id": "run_approval_pending",
+  "entry_count": 2,
+  "entries": [
+    {
+      "entry_id": "jrnl_run_approval_pending_0001",
+      "event_id": "evt_init_1",
+      "timestamp": "2026-02-15T09:00:00Z",
+      "event_type": "action",
+      "title": "Start transfer workflow",
+      "details": "Agent prepared transfer request",
+      "payload_ref": {
+        "run_id": "run_approval_pending",
+        "event_id": "evt_init_1",
+        "path": "/v1/runs/run_approval_pending/events#evt_init_1"
+      },
+      "approval_context": {
+        "requires_approval": false,
+        "status": "not_required",
+        "requested_by": null,
+        "resolved_by": null,
+        "resolved_at": null,
+        "reason": null
+      }
+    },
+    {
+      "entry_id": "jrnl_run_approval_pending_0002",
+      "event_id": "evt_approval_req_1",
+      "timestamp": "2026-02-15T09:01:00Z",
+      "event_type": "approval_requested",
+      "title": "Approval required",
+      "details": "Transfer exceeds policy threshold",
+      "payload_ref": {
+        "run_id": "run_approval_pending",
+        "event_id": "evt_approval_req_1",
+        "path": "/v1/runs/run_approval_pending/events#evt_approval_req_1"
+      },
+      "approval_context": {
+        "requires_approval": true,
+        "status": "pending",
+        "requested_by": "agent",
+        "resolved_by": null,
+        "resolved_at": null,
+        "reason": "Transfer exceeds policy threshold"
+      }
+    }
+  ]
+}
+```
+
+Example — post-resolution flow:
+
+```json
+{
+  "run_id": "run_approval_resolved",
+  "entry_count": 3,
+  "entries": [
+    {
+      "entry_id": "jrnl_run_approval_resolved_0001",
+      "event_id": "evt_init_1",
+      "timestamp": "2026-02-15T10:00:00Z",
+      "event_type": "action",
+      "title": "Start transfer workflow",
+      "details": "Agent prepared transfer request",
+      "payload_ref": {
+        "run_id": "run_approval_resolved",
+        "event_id": "evt_init_1",
+        "path": "/v1/runs/run_approval_resolved/events#evt_init_1"
+      },
+      "approval_context": {
+        "requires_approval": false,
+        "status": "not_required",
+        "requested_by": null,
+        "resolved_by": null,
+        "resolved_at": null,
+        "reason": null
+      }
+    },
+    {
+      "entry_id": "jrnl_run_approval_resolved_0002",
+      "event_id": "evt_approval_req_1",
+      "timestamp": "2026-02-15T10:01:00Z",
+      "event_type": "approval_requested",
+      "title": "Approval required",
+      "details": "Transfer exceeds policy threshold",
+      "payload_ref": {
+        "run_id": "run_approval_resolved",
+        "event_id": "evt_approval_req_1",
+        "path": "/v1/runs/run_approval_resolved/events#evt_approval_req_1"
+      },
+      "approval_context": {
+        "requires_approval": true,
+        "status": "pending",
+        "requested_by": "agent",
+        "resolved_by": null,
+        "resolved_at": null,
+        "reason": "Transfer exceeds policy threshold"
+      }
+    },
+    {
+      "entry_id": "jrnl_run_approval_resolved_0003",
+      "event_id": "evt_approval_res_1",
+      "timestamp": "2026-02-15T10:02:00Z",
+      "event_type": "approval_resolved",
+      "title": "Approval decision recorded",
+      "details": "Human reviewer approved transfer",
+      "payload_ref": {
+        "run_id": "run_approval_resolved",
+        "event_id": "evt_approval_res_1",
+        "path": "/v1/runs/run_approval_resolved/events#evt_approval_res_1"
+      },
+      "approval_context": {
+        "requires_approval": true,
+        "status": "approved",
+        "requested_by": "agent",
+        "resolved_by": "human_reviewer",
+        "resolved_at": "2026-02-15T10:02:00Z",
+        "reason": "Within policy after manual verification"
+      }
+    }
+  ]
+}
+```
+
+Issue links:
+
+- Parent: #5
+- Related constraints: #13, #15
+
 ## POST /v1/approvals/:eventId
 
 Resolve pending approval.
