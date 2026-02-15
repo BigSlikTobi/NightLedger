@@ -254,3 +254,54 @@ def test_issue34_round1_get_run_journal_surfaces_approval_timeline_inconsistency
     body = response.json()
     assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
     assert body["error"]["details"][0]["code"] == "NO_PENDING_APPROVAL"
+
+
+def test_issue34_round2_get_run_journal_is_deterministically_ordered_for_realistic_run() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    ingest(
+        build_event_payload(
+            event_id="evt_order_late",
+            run_id="run_order_realistic",
+            timestamp="2026-02-17T18:01:00Z",
+            event_type="approval_resolved",
+            title="Approval resolved",
+            details="Human approved transfer",
+            requires_approval=True,
+            approval_status="approved",
+            requested_by="agent",
+            resolved_by="human_reviewer",
+            resolved_at="2026-02-17T18:01:00Z",
+            reason="within policy",
+        )
+    )
+    ingest(
+        build_event_payload(
+            event_id="evt_order_early",
+            run_id="run_order_realistic",
+            timestamp="2026-02-17T18:00:00Z",
+            event_type="approval_requested",
+            title="Approval required",
+            details="Transfer exceeds threshold",
+            requires_approval=True,
+            approval_status="pending",
+            requested_by="agent",
+            reason="Transfer exceeds threshold",
+        )
+    )
+
+    response = client.get("/v1/runs/run_order_realistic/journal")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["run_id"] == "run_order_realistic"
+    assert body["entry_count"] == 2
+    assert [entry["event_id"] for entry in body["entries"]] == [
+        "evt_order_early",
+        "evt_order_late",
+    ]
+    assert [entry["entry_id"] for entry in body["entries"]] == [
+        "jrnl_run_order_realistic_0001",
+        "jrnl_run_order_realistic_0002",
+    ]
