@@ -305,3 +305,26 @@ def test_issue34_round2_get_run_journal_is_deterministically_ordered_for_realist
         "jrnl_run_order_realistic_0001",
         "jrnl_run_order_realistic_0002",
     ]
+
+
+def test_issue34_round3_get_run_journal_unknown_run_uses_full_error_envelope() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    response = client.get("/v1/runs/run_issue34_unknown/journal")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {
+            "code": "RUN_NOT_FOUND",
+            "message": "Run not found",
+            "details": [
+                {
+                    "path": "run_id",
+                    "message": "No events found for run 'run_issue34_unknown'",
+                    "type": "not_found",
+                    "code": "RUN_NOT_FOUND",
+                }
+            ],
+        }
+    }
