@@ -88,6 +88,7 @@ class RunJournalProjection:
 
 def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournalProjection:
     entries: list[JournalEntry] = []
+    last_timestamp: datetime | None = None
 
     for index, event in enumerate(events, start=1):
         if event.run_id != run_id:
@@ -99,6 +100,14 @@ def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournal
                 detail_code="CROSS_RUN_EVENT_STREAM",
                 detail_type="state_conflict",
             )
+        if last_timestamp is not None and event.timestamp < last_timestamp:
+            raise InconsistentRunStateError(
+                detail_path="timestamp",
+                detail_message="event stream must be ordered by ascending timestamp",
+                detail_code="UNORDERED_EVENT_STREAM",
+                detail_type="state_conflict",
+            )
+        last_timestamp = event.timestamp
 
         payload = event.payload
         approval = payload.get("approval", {})

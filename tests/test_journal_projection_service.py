@@ -2,9 +2,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 import sys
 
+import pytest
+
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
 from nightledger_api.services.event_store import StoredEvent  # noqa: E402
+from nightledger_api.services.errors import InconsistentRunStateError  # noqa: E402
 from nightledger_api.services.journal_projection_service import project_run_journal  # noqa: E402
 
 
@@ -202,3 +205,25 @@ def test_round4_project_run_journal_includes_structured_metadata_block() -> None
         "risk_level": "low",
         "integrity_warning": False,
     }
+
+
+def test_round5_project_run_journal_fails_loud_on_unordered_input() -> None:
+    with pytest.raises(InconsistentRunStateError) as exc_info:
+        project_run_journal(
+            run_id="run_journal_order",
+            events=[
+                _stored_event(
+                    event_id="evt_order_2",
+                    run_id="run_journal_order",
+                    timestamp="2026-02-17T13:01:00Z",
+                ),
+                _stored_event(
+                    event_id="evt_order_1",
+                    run_id="run_journal_order",
+                    timestamp="2026-02-17T13:00:00Z",
+                ),
+            ],
+        )
+
+    assert exc_info.value.detail_path == "timestamp"
+    assert exc_info.value.detail_code == "UNORDERED_EVENT_STREAM"
