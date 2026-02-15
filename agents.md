@@ -122,6 +122,15 @@ Always follow autonomously follow this iterative cycle form start to finish:
      confirm everything is green.
 3. **Execution:** Create a detailed PR and push to git.
 
+### 5. Diary Update Is Mandatory
+
+When issue work is finished, you **must** add a diary entry in
+`docs/diary.md`.
+
+- The entry must be human-readable.
+- It must summarize what was built, how it was validated, and key findings.
+- This is required for every completed issue.
+
 ## 🧠 Your Role
 
 You are not just a code generator; you are a **Systems Architect** and **Safety
