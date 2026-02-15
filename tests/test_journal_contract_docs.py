@@ -36,3 +36,13 @@ def test_round2_journal_endpoint_defines_response_shape_and_minimum_fields() -> 
     assert "event_id" in journal
     assert "payload_ref" in journal
     assert "approval_context" in journal
+
+
+def test_round3_journal_endpoint_defines_deterministic_order_and_tiebreak() -> None:
+    api_md = _load("spec/API.md")
+    journal = _section(api_md, "GET /v1/runs/{run_id}/journal")
+    normalized = journal.lower()
+
+    assert "deterministic projection semantics:" in normalized
+    assert "timestamp" in normalized and "ascending" in normalized
+    assert "append sequence" in normalized

@@ -279,6 +279,12 @@ Minimum entry fields:
 - Approval context indicators: `approval_context.requires_approval`,
   `approval_context.status`, plus resolver fields when resolved
 
+Deterministic projection semantics:
+
+- Results are deterministic for the same append-only event stream.
+- Entries are sorted by source event `timestamp` ascending.
+- Timestamp ties are resolved by append sequence ascending.
+
 ## POST /v1/approvals/:eventId
 
 Resolve pending approval.
