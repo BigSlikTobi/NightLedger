@@ -3,6 +3,7 @@ export function createTimelineController({
   getDemoEvents,
   getJournalEvents,
   listPendingApprovals,
+  getDemoPendingApprovals,
   resolveApproval,
   onState,
 }) {
@@ -43,7 +44,9 @@ export function createTimelineController({
     emit();
 
     try {
-      state.pendingApprovals = await listPendingApprovals();
+      state.pendingApprovals = runId === "demo" && getDemoPendingApprovals
+        ? await getDemoPendingApprovals()
+        : await listPendingApprovals();
       state.pendingStatus = "success";
       emit();
     } catch (err) {

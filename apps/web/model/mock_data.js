@@ -37,3 +37,20 @@ export const MOCK_EVENTS = [
     evidence_links: ["https://example.com/logs/rotation-error"]
   }
 ];
+
+export const MOCK_PENDING_APPROVALS = [
+  {
+    event_id: "evt_101",
+    title: "AWS Spend Request",
+    summary: "Agent requested 50.00 USD for GPU compute credits.",
+    risk_level: "high",
+    details: "This request is for a new experiment in the 'vector-prod-01' domain."
+  },
+  {
+    event_id: "evt_102",
+    title: "Database Access",
+    summary: "Agent requested write access to internal database.",
+    risk_level: "medium",
+    details: "The agent needs to persist results of the compute run."
+  }
+];

@@ -1,5 +1,5 @@
 import { createApp, computed, reactive } from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
-import { MOCK_EVENTS } from "../model/mock_data.js";
+import { MOCK_EVENTS, MOCK_PENDING_APPROVALS } from "../model/mock_data.js";
 import { toTimelineCards } from "../model/timeline_model.js";
 import { createTimelineController } from "../controller/timeline_controller.js";
 
@@ -62,6 +62,10 @@ createApp({
       },
       getJournalEvents: fetchJournalEvents,
       listPendingApprovals: fetchPendingApprovals,
+      getDemoPendingApprovals: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        return MOCK_PENDING_APPROVALS;
+      },
       resolveApproval: postApprovalDecision,
       onState: (next) => {
         state.status = next.status;
