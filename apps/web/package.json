@@ -1,0 +1,9 @@
+{
+  "name": "nightledger-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test model/*.test.js controller/*.test.js",
+    "start": "npx serve ."
+  }
+}
