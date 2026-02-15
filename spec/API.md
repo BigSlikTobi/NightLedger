@@ -240,6 +240,45 @@ Behavior:
 - Inconsistent state projection: `409 Conflict` / `INCONSISTENT_RUN_STATE`
 - Storage read failure: `500 Internal Server Error` / `STORAGE_READ_ERROR`
 
+Response shape (v0 draft):
+
+```json
+{
+  "run_id": "run_123",
+  "entry_count": 1,
+  "entries": [
+    {
+      "entry_id": "jrnl_run_123_0001",
+      "event_id": "evt_approval_1",
+      "timestamp": "2026-02-14T13:00:00Z",
+      "event_type": "approval_requested",
+      "title": "Approval required",
+      "details": "Transfer exceeds policy threshold",
+      "payload_ref": {
+        "run_id": "run_123",
+        "event_id": "evt_approval_1",
+        "path": "/v1/runs/run_123/events#evt_approval_1"
+      },
+      "approval_context": {
+        "requires_approval": true,
+        "status": "pending",
+        "requested_by": "agent",
+        "resolved_by": null,
+        "resolved_at": null,
+        "reason": "Transfer exceeds policy threshold"
+      }
+    }
+  ]
+}
+```
+
+Minimum entry fields:
+
+- Human-readable text: `title`, `details`
+- Event traceability: `event_id`, `payload_ref`
+- Approval context indicators: `approval_context.requires_approval`,
+  `approval_context.status`, plus resolver fields when resolved
+
 ## POST /v1/approvals/:eventId
 
 Resolve pending approval.
