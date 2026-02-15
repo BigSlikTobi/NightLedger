@@ -46,6 +46,9 @@ def _map_rule_code(path: str, error_type: str) -> str:
 
     if path in {"title", "details"} and error_type in {"string_too_short", "missing"}:
         return "MISSING_TIMELINE_FIELDS"
+    
+    if path == "run_id" and error_type == "string_too_short":
+        return "MISSING_RUN_ID"
 
     if error_type == "literal_error":
         return _literal_error_code(path)

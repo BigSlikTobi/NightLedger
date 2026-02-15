@@ -48,7 +48,7 @@ class EventPayload(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     id: str = Field(min_length=1)
-    run_id: str
+    run_id: str = Field(min_length=1)
     timestamp: datetime
     type: EventType
     actor: ActorType

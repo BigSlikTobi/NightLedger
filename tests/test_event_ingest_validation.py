@@ -51,10 +51,14 @@ def extract_error_details(body: dict[str, object]) -> dict[str, dict[str, str]]:
 
 
 def test_post_events_accepts_valid_payload() -> None:
-    response = client.post("/v1/events", json=valid_event_payload())
+    payload = valid_event_payload()
+    payload["id"] = "evt_valid_payload"
+    response = client.post("/v1/events", json=payload)
 
     assert response.status_code == 201
-    assert response.json() == {"status": "accepted"}
+    body = response.json()
+    assert body["status"] == "accepted"
+    assert body["event_id"] == "evt_valid_payload"
 
 
 def test_post_events_rejects_missing_required_fields_with_structured_errors() -> None:
@@ -242,12 +246,14 @@ def test_post_events_accepts_confidence_boundary_values() -> None:
     """Test confidence = 0.0 and 1.0 are accepted."""
     # Test lower boundary
     payload_lower = valid_event_payload()
+    payload_lower["id"] = "evt_conf_lower"
     payload_lower["confidence"] = 0.0
     response_lower = client.post("/v1/events", json=payload_lower)
     assert response_lower.status_code == 201
 
     # Test upper boundary
     payload_upper = valid_event_payload()
+    payload_upper["id"] = "evt_conf_upper"
     payload_upper["confidence"] = 1.0
     response_upper = client.post("/v1/events", json=payload_upper)
     assert response_upper.status_code == 201
@@ -322,6 +328,7 @@ def test_post_events_rejects_incomplete_evidence_item() -> None:
 def test_post_events_accepts_empty_evidence_array() -> None:
     """Test empty evidence array is accepted (default value)."""
     payload = valid_event_payload()
+    payload["id"] = "evt_empty_evidence"
     payload["evidence"] = []
 
     response = client.post("/v1/events", json=payload)
@@ -400,6 +407,7 @@ def test_post_events_accumulates_errors_across_depth_levels() -> None:
 def test_post_events_accepts_payload_without_confidence() -> None:
     """Test confidence field is optional and can be omitted."""
     payload = valid_event_payload()
+    payload["id"] = "evt_no_confidence"
     del payload["confidence"]
 
     response = client.post("/v1/events", json=payload)
