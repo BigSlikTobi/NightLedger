@@ -30,6 +30,8 @@ This maps MVC onto NightLedger's separation-of-concerns model:
 - Journal projection ownership belongs to the representation layer.
 - Representation code must not enforce governance policy or mutate core state.
 - Governance services remain the source of truth for risk/approval state transitions.
+- Runtime projection is implemented in `src/nightledger_api/services/journal_projection_service.py`
+  as a pure transformation from ordered `StoredEvent` records to readable entries.
 
 ## Data Shape
 - Event stream per run (`run_id` partition)
