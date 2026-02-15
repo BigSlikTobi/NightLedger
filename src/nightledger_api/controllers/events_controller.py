@@ -17,6 +17,7 @@ from nightledger_api.services.errors import (
     StorageReadError,
     StorageWriteError,
 )
+from nightledger_api.services.journal_projection_service import project_run_journal
 from nightledger_api.services.run_status_service import project_run_status
 
 
@@ -100,6 +101,15 @@ def get_run_status(
         "status": projection.status,
         "pending_approval": projection.pending_approval,
     }
+
+
+@router.get("/v1/runs/{run_id}/journal", status_code=status.HTTP_200_OK)
+def get_run_journal(
+    run_id: str, store: EventStore = Depends(get_event_store)
+) -> dict[str, Any]:
+    events = store.list_by_run_id(run_id)
+    projection = project_run_journal(run_id=run_id, events=events)
+    return projection.to_dict()
 
 
 @router.get("/v1/approvals/pending", status_code=status.HTTP_200_OK)
