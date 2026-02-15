@@ -83,3 +83,45 @@ test("prevents duplicate approval submissions", async () => {
   assert.equal(calls, 1);
   assert.equal(controller.state.pendingApprovals.length, 0);
 });
+
+test("handles stale approval decision safely", async () => {
+  const controller = createTimelineController({
+    runId: "run-1",
+    getDemoEvents: async () => [],
+    getJournalEvents: async () => [],
+    listPendingApprovals: async () => [],
+    resolveApproval: async () => ({ ok: true }),
+    onState: () => {},
+  });
+
+  await controller.submitApprovalDecision("evt-missing", "approved");
+
+  assert.equal(controller.state.pendingError, "Approval is no longer pending.");
+});
+
+test("keeps approval card visible when resolve fails and allows retry", async () => {
+  let shouldFail = true;
+  const controller = createTimelineController({
+    runId: "run-1",
+    getDemoEvents: async () => [],
+    getJournalEvents: async () => [],
+    listPendingApprovals: async () => [{ event_id: "evt-1", title: "Spend Request" }],
+    resolveApproval: async () => {
+      if (shouldFail) throw new Error("Request failed (500)");
+      return { ok: true };
+    },
+    onState: () => {},
+  });
+
+  await controller.loadPendingApprovals();
+  await controller.submitApprovalDecision("evt-1", "approved");
+
+  assert.equal(controller.state.pendingApprovals.length, 1);
+  assert.match(controller.state.pendingError, /500/);
+
+  shouldFail = false;
+  await controller.submitApprovalDecision("evt-1", "approved");
+
+  assert.equal(controller.state.pendingApprovals.length, 0);
+  assert.equal(controller.state.pendingError, "");
+});
