@@ -84,6 +84,21 @@ Always follow autonomously follow this iterative cycle form start to finish:
 > **No Pre-Planning:** Do **not** plan all 5 rounds upfront. Each round's
 > execution plan is created **only after** the previous round is fully complete.
 > The findings from round N inform the plan for round N+1.
+>
+> **Mandatory Under All Circumstances:** This exact sequence is non-optional for
+> every issue and every implementation task. No exceptions for speed, urgency,
+> or convenience.
+>
+> **Sequence Lock:** A round is valid only if it follows this order:
+> Goal Re-Read -> Pattern Investigation -> Failing Tests -> Minimal
+> Implementation -> Full-Suite Verification.
+>
+> **Round Dependency Rule:** Round N+1 must be derived from explicit findings in
+> round N. You must not define future rounds in advance, and you must not
+> retrofit rounds after implementation.
+>
+> **Integrity Rule:** If this sequence is broken, stop and restart the issue
+> from a clean state.
 
 1. **Cycle (Repeat 5 Rounds, one at a time):**
    - **Goal Re-Read:** Re-read the original issue / goal description to maintain
