@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test apps/web/journal.test.js"
+    "test": "node --test journal.test.js"
   }
 }
