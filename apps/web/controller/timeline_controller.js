@@ -54,14 +54,25 @@ export function createTimelineController({
   }
 
   async function submitApprovalDecision(eventId, decision) {
+    const isKnownPending = state.pendingApprovals.some((item) => item.event_id === eventId);
+    if (!isKnownPending) {
+      state.pendingError = "Approval is no longer pending.";
+      emit();
+      return;
+    }
+
     if (state.pendingSubmissionByEventId[eventId]) return;
 
     state.pendingSubmissionByEventId[eventId] = true;
+    state.pendingError = "";
     emit();
 
     try {
       await resolveApproval(eventId, decision);
       state.pendingApprovals = state.pendingApprovals.filter((item) => item.event_id !== eventId);
+      emit();
+    } catch (err) {
+      state.pendingError = err?.message ?? "Could not resolve approval.";
       emit();
     } finally {
       state.pendingSubmissionByEventId[eventId] = false;

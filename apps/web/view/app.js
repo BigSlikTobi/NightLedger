@@ -103,26 +103,29 @@ createApp({
         <div v-else-if="state.pendingStatus === 'error'" class="state state--error">
           Could not load pending approvals. {{ state.pendingError }}
         </div>
-        <div v-else-if="state.pendingApprovals.length === 0" class="state">No pending approvals.</div>
-        <div v-else class="pending-list">
-          <article v-for="item in state.pendingApprovals" :key="item.event_id" class="card card--approval">
-            <div class="card__head">
-              <h3>{{ item.title || item.event_id }}</h3>
-              <span class="pill">risk: {{ (item.risk_level || 'unknown').toUpperCase() }}</span>
-            </div>
-            <p>{{ item.summary || item.details || 'Approval required.' }}</p>
-            <div class="actions">
-              <button
-                @click="onApprove(item.event_id)"
-                :disabled="state.pendingSubmissionByEventId[item.event_id]"
-              >Approve</button>
-              <button
-                @click="onReject(item.event_id)"
-                :disabled="state.pendingSubmissionByEventId[item.event_id]"
-              >Reject</button>
-            </div>
-          </article>
-        </div>
+        <template v-else>
+          <div v-if="state.pendingError" class="state state--error">{{ state.pendingError }}</div>
+          <div v-if="state.pendingApprovals.length === 0" class="state">No pending approvals.</div>
+          <div v-else class="pending-list">
+            <article v-for="item in state.pendingApprovals" :key="item.event_id" class="card card--approval">
+              <div class="card__head">
+                <h3>{{ item.title || item.event_id }}</h3>
+                <span class="pill">risk: {{ (item.risk_level || 'unknown').toUpperCase() }}</span>
+              </div>
+              <p>{{ item.summary || item.details || 'Approval required.' }}</p>
+              <div class="actions">
+                <button
+                  @click="onApprove(item.event_id)"
+                  :disabled="state.pendingSubmissionByEventId[item.event_id]"
+                >Approve</button>
+                <button
+                  @click="onReject(item.event_id)"
+                  :disabled="state.pendingSubmissionByEventId[item.event_id]"
+                >Reject</button>
+              </div>
+            </article>
+          </div>
+        </template>
       </section>
 
       <div v-if="state.status === 'success' && cards.length === 0" class="state">No journal events for this run yet.</div>
