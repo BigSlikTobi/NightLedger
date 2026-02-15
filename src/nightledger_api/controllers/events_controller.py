@@ -117,6 +117,8 @@ def get_run_journal(
     if not events:
         raise RunNotFoundError(run_id=run_id)
     projection = project_run_journal(run_id=run_id, events=events)
+    # Reuse run status projection as an approval-timeline consistency guard.
+    project_run_status(events)
     return projection.to_dict()
 
 

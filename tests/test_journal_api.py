@@ -226,3 +226,31 @@ def test_round5_get_run_journal_surfaces_inconsistent_state_for_invalid_payload(
     assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
     assert body["error"]["details"][0]["path"] == "payload"
     assert body["error"]["details"][0]["code"] == "INVALID_EVENT_PAYLOAD"
+
+
+def test_issue34_round1_get_run_journal_surfaces_approval_timeline_inconsistency() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    ingest(
+        build_event_payload(
+            event_id="evt_timeline_inconsistent",
+            run_id="run_timeline_inconsistent",
+            timestamp="2026-02-17T17:00:00Z",
+            event_type="approval_resolved",
+            title="Approval resolved",
+            details="Approval was resolved without approver identity",
+            requires_approval=True,
+            approval_status="approved",
+            requested_by="agent",
+            resolved_at="2026-02-17T17:00:00Z",
+            reason="policy exception",
+        )
+    )
+
+    response = client.get("/v1/runs/run_timeline_inconsistent/journal")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
+    assert body["error"]["details"][0]["code"] == "NO_PENDING_APPROVAL"
