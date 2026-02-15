@@ -93,6 +93,12 @@ def test_round1_project_run_journal_maps_baseline_readable_entry() -> None:
                     "resolved_at": None,
                     "reason": None,
                 },
+                "metadata": {
+                    "actor": "agent",
+                    "confidence": 0.8,
+                    "risk_level": "low",
+                    "integrity_warning": False,
+                },
             }
         ],
     }
@@ -170,4 +176,29 @@ def test_round3_project_run_journal_surfaces_approval_transition_indicators() ->
         "is_approval_required": True,
         "is_approval_resolved": True,
         "decision": "approved",
+    }
+
+
+def test_round4_project_run_journal_includes_structured_metadata_block() -> None:
+    projection = project_run_journal(
+        run_id="run_journal_meta",
+        events=[
+            _stored_event(
+                event_id="evt_meta_1",
+                run_id="run_journal_meta",
+                timestamp="2026-02-17T12:00:00Z",
+                event_type="decision",
+                title="Risk decision made",
+                details="Agent selected low-risk execution path",
+                requires_approval=False,
+                approval_status="not_required",
+            )
+        ],
+    ).to_dict()
+
+    assert projection["entries"][0]["metadata"] == {
+        "actor": "agent",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "integrity_warning": False,
     }

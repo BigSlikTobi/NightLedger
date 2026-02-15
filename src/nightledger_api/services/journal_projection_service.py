@@ -50,6 +50,7 @@ class JournalEntry:
     details: str
     payload_ref: PayloadRef
     approval_context: ApprovalContext
+    metadata: dict[str, Any]
     evidence_refs: list[dict[str, str]]
     approval_indicator: dict[str, Any] | None
 
@@ -63,6 +64,7 @@ class JournalEntry:
             "details": self.details,
             "payload_ref": self.payload_ref.to_dict(),
             "approval_context": self.approval_context.to_dict(),
+            "metadata": self.metadata,
         }
         if self.evidence_refs:
             body["evidence_refs"] = self.evidence_refs
@@ -122,6 +124,12 @@ def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournal
                     resolved_at=_optional_timestamp_string(approval.get("resolved_at")),
                     reason=_optional_string(approval.get("reason")),
                 ),
+                metadata={
+                    "actor": _string(payload.get("actor")),
+                    "confidence": payload.get("confidence"),
+                    "risk_level": _optional_string(payload.get("risk_level")),
+                    "integrity_warning": event.integrity_warning,
+                },
                 evidence_refs=_evidence_refs(payload.get("evidence")),
                 approval_indicator=_approval_indicator(payload, approval),
             )
