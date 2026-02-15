@@ -328,3 +328,25 @@ def test_issue34_round3_get_run_journal_unknown_run_uses_full_error_envelope() -
             ],
         }
     }
+
+
+def test_issue34_round4_get_run_journal_storage_failure_uses_full_error_envelope() -> None:
+    app.dependency_overrides[get_event_store] = lambda: _FailingJournalReadStore()
+
+    response = client.get("/v1/runs/run_issue34_storage_fail/journal")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "error": {
+            "code": "STORAGE_READ_ERROR",
+            "message": "Failed to load events",
+            "details": [
+                {
+                    "path": "storage",
+                    "message": "storage backend read failed",
+                    "type": "storage_failure",
+                    "code": "STORAGE_READ_FAILED",
+                }
+            ],
+        }
+    }
