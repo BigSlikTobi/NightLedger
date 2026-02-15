@@ -51,6 +51,7 @@ class JournalEntry:
     payload_ref: PayloadRef
     approval_context: ApprovalContext
     evidence_refs: list[dict[str, str]]
+    approval_indicator: dict[str, Any] | None
 
     def to_dict(self) -> dict[str, Any]:
         body: dict[str, Any] = {
@@ -65,6 +66,8 @@ class JournalEntry:
         }
         if self.evidence_refs:
             body["evidence_refs"] = self.evidence_refs
+        if self.approval_indicator is not None:
+            body["approval_indicator"] = self.approval_indicator
         return body
 
 
@@ -120,6 +123,7 @@ def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournal
                     reason=_optional_string(approval.get("reason")),
                 ),
                 evidence_refs=_evidence_refs(payload.get("evidence")),
+                approval_indicator=_approval_indicator(payload, approval),
             )
         )
 
@@ -173,6 +177,26 @@ def _evidence_refs(value: Any) -> list[dict[str, str]]:
             }
         )
     return refs
+
+
+def _approval_indicator(payload: dict[str, Any], approval: Any) -> dict[str, Any] | None:
+    approval_status = _approval_status(approval)
+    event_type = _string(payload.get("type"))
+    is_approval_required = bool(payload.get("requires_approval", False)) or (
+        event_type == "approval_requested"
+    )
+    is_approval_resolved = event_type == "approval_resolved" or (
+        approval_status in {"approved", "rejected"}
+    )
+
+    if not is_approval_required and not is_approval_resolved:
+        return None
+
+    return {
+        "is_approval_required": is_approval_required,
+        "is_approval_resolved": is_approval_resolved,
+        "decision": approval_status if is_approval_resolved else None,
+    }
 
 
 def _format_timestamp(value: datetime) -> str:

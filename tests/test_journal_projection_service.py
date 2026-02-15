@@ -126,3 +126,48 @@ def test_round2_project_run_journal_includes_evidence_references() -> None:
         {"kind": "log", "label": "Runtime log", "ref": "log://run/1"},
         {"kind": "artifact", "label": "Output bundle", "ref": "artifact://bundle/abc"},
     ]
+
+
+def test_round3_project_run_journal_surfaces_approval_transition_indicators() -> None:
+    projection = project_run_journal(
+        run_id="run_journal_approval",
+        events=[
+            _stored_event(
+                event_id="evt_apr_req",
+                run_id="run_journal_approval",
+                timestamp="2026-02-17T11:00:00Z",
+                event_type="approval_requested",
+                title="Approval required",
+                details="Transfer exceeds threshold",
+                requires_approval=True,
+                approval_status="pending",
+                requested_by="agent",
+                reason="Transfer exceeds threshold",
+            ),
+            _stored_event(
+                event_id="evt_apr_res",
+                run_id="run_journal_approval",
+                timestamp="2026-02-17T11:01:00Z",
+                event_type="approval_resolved",
+                title="Approval resolved",
+                details="Human approved transfer",
+                requires_approval=True,
+                approval_status="approved",
+                requested_by="agent",
+                resolved_by="human_reviewer",
+                resolved_at="2026-02-17T11:01:00Z",
+                reason="Within policy",
+            ),
+        ],
+    ).to_dict()
+
+    assert projection["entries"][0]["approval_indicator"] == {
+        "is_approval_required": True,
+        "is_approval_resolved": False,
+        "decision": None,
+    }
+    assert projection["entries"][1]["approval_indicator"] == {
+        "is_approval_required": True,
+        "is_approval_resolved": True,
+        "decision": "approved",
+    }
