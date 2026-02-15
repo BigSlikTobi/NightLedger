@@ -60,6 +60,8 @@ down.
   bundle formatting changes with logic fixes.
 - **Verify Each Step:** Ensure the build passes and tests run green before every
   commit.
+- **No Pushes to Main:** **NEVER** push directly to the `main` branch. Always
+  create a feature branch, push there, and use a Pull Request for merging.
 
 ### 3. Conventional Commits
 
