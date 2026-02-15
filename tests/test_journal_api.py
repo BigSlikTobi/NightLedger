@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 import sys
 from typing import Any
@@ -196,3 +197,32 @@ def test_round4_get_run_journal_surfaces_inconsistent_state_for_invalid_timestam
     assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
     assert body["error"]["details"][0]["path"] == "timestamp"
     assert body["error"]["details"][0]["code"] == "INVALID_EVENT_TIMESTAMP"
+
+
+class _InvalidPayloadJournalStore:
+    def append(self, event: Any) -> Any:
+        _ = event
+        raise RuntimeError("append should not be called")
+
+    def list_by_run_id(self, run_id: str) -> list[Any]:
+        return [
+            StoredEvent(
+                id="evt_invalid_payload",
+                timestamp=datetime.fromisoformat("2026-02-17T16:00:00+00:00"),
+                run_id=run_id,
+                payload="corrupt-payload",  # type: ignore[arg-type]
+                integrity_warning=False,
+            )
+        ]
+
+
+def test_round5_get_run_journal_surfaces_inconsistent_state_for_invalid_payload() -> None:
+    app.dependency_overrides[get_event_store] = lambda: _InvalidPayloadJournalStore()
+
+    response = client.get("/v1/runs/run_invalid_payload/journal")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
+    assert body["error"]["details"][0]["path"] == "payload"
+    assert body["error"]["details"][0]["code"] == "INVALID_EVENT_PAYLOAD"

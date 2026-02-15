@@ -117,7 +117,15 @@ def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournal
         last_timestamp = event.timestamp
 
         payload = event.payload
-        approval = payload.get("approval", {})
+        if not isinstance(payload, dict):
+            raise InconsistentRunStateError(
+                detail_path="payload",
+                detail_message="event payload must be an object",
+                detail_code="INVALID_EVENT_PAYLOAD",
+                detail_type="state_conflict",
+            )
+        approval_raw = payload.get("approval", {})
+        approval = approval_raw if isinstance(approval_raw, dict) else {}
 
         entries.append(
             JournalEntry(
