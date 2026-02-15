@@ -240,9 +240,129 @@ Resolve pending approval.
 Request:
 
 ```json
-{ "decision": "approved|rejected", "reason": "optional" }
+{
+  "decision": "approved|rejected",
+  "approver_id": "human_123",
+  "reason": "optional"
+}
+```
+
+`approver_id` must be a non-empty, non-whitespace string.
+
+Response (v0 draft):
+
+```json
+{
+  "status": "resolved",
+  "event_id": "apr_evt_123_approved_20260215T130100Z",
+  "target_event_id": "evt_123",
+  "run_id": "run_123",
+  "decision": "approved",
+  "resolved_at": "2026-02-15T13:01:00Z"
+}
+```
+
+Error responses (v0 draft):
+
+- Unknown target approval event: `404` / `APPROVAL_NOT_FOUND`
+- Ambiguous target event ID across runs: `409` / `AMBIGUOUS_EVENT_ID`
+- No currently pending approval for target: `409` / `NO_PENDING_APPROVAL`
+- Target approval already resolved: `409` / `DUPLICATE_APPROVAL`
+- Storage append failure while writing approval resolution: `500` / `STORAGE_WRITE_ERROR`
+- Stale resolution attempts for previously resolved targets return
+  `DUPLICATE_APPROVAL` even if a different approval is currently pending.
+
+Resolution semantics:
+
+- Approvals are modeled as append-only `approval_resolved` events.
+- Legal transition is `pending -> approved|rejected`.
+- `approver_id` and `resolved_at` must be present on resolved events.
+- `decision="rejected"` writes terminal approval metadata for stop semantics.
+
+Ambiguous event ID error response (v0 draft):
+
+```json
+{
+  "error": {
+    "code": "AMBIGUOUS_EVENT_ID",
+    "message": "Event ID maps to multiple runs",
+    "details": [
+      {
+        "path": "event_id",
+        "message": "Event ID 'evt_123' exists in multiple runs",
+        "type": "state_conflict",
+        "code": "AMBIGUOUS_EVENT_ID"
+      }
+    ]
+  }
+}
+```
+
+Duplicate approval error response (v0 draft):
+
+```json
+{
+  "error": {
+    "code": "DUPLICATE_APPROVAL",
+    "message": "Approval already resolved",
+    "details": [
+      {
+        "path": "event_id",
+        "message": "Approval for event 'evt_123' has already been resolved",
+        "type": "state_conflict",
+        "code": "DUPLICATE_APPROVAL"
+      }
+    ]
+  }
+}
+```
+
+No pending approval error response (v0 draft):
+
+```json
+{
+  "error": {
+    "code": "NO_PENDING_APPROVAL",
+    "message": "No pending approval for target event",
+    "details": [
+      {
+        "path": "event_id",
+        "message": "Event 'evt_123' is not the currently pending approval",
+        "type": "state_conflict",
+        "code": "NO_PENDING_APPROVAL"
+      }
+    ]
+  }
+}
 ```
 
 ## GET /v1/approvals/pending
 
 List all pending approvals.
+
+Response (v0 draft):
+
+```json
+{
+  "pending_count": 1,
+  "approvals": [
+    {
+      "event_id": "evt_123",
+      "run_id": "run_123",
+      "requested_at": "2026-02-15T13:00:00Z",
+      "requested_by": "agent",
+      "title": "Approval required",
+      "details": "Transfer exceeds threshold",
+      "reason": "Transfer exceeds threshold",
+      "risk_level": "high"
+    }
+  ]
+}
+```
+
+Behavior:
+
+- Returns unresolved pending approvals across all runs.
+- Intended for polling/UI refresh; payload is stable and deterministic.
+- If any run contains an inconsistent approval timeline, endpoint returns `409`
+  / `INCONSISTENT_RUN_STATE` (fail-loud semantics).

@@ -6,6 +6,101 @@ layer.
 
 ---
 
+## 🗓️ 2026-02-15: Issue #4 — Approval State Machine + Endpoints (5-Round Big Slik Cycle)
+
+### 🎯 Objective
+
+Ship the human-control surface for risky actions:
+
+- `GET /v1/approvals/pending`
+- `POST /v1/approvals/:eventId`
+
+with strict transition rules (`pending -> approved|rejected`) and fail-loud
+errors for illegal or stale transitions.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — Baseline Approval Flow
+
+1. **Pattern Investigation:** Reviewed `spec/API.md`, `spec/BUSINESS_RULES.md`
+   and current run-status projection behavior to anchor approval semantics.
+2. **Failing Tests:** Added first endpoint tests for:
+   - retrieving pending approvals
+   - approving a pending request
+   - rejecting a pending request
+3. **Implementation:** Added `approval_service.py`, wired new controller routes,
+   and introduced `list_all()` in the store protocol for cross-run pending
+   scans.
+4. **Verification:** Ran approvals tests, then full suite.
+5. **Outcome/Learning:** Core happy path worked; error semantics still needed
+   hardening.
+
+### Round 2 — Illegal Transition Blocking
+
+1. **Pattern Investigation:** Audited edge paths where event IDs are missing,
+   duplicated across runs, or target non-pending events.
+2. **Failing Tests:** Added explicit cases for:
+   - `APPROVAL_NOT_FOUND`
+   - `AMBIGUOUS_EVENT_ID`
+   - `NO_PENDING_APPROVAL`
+3. **Implementation:** Added typed domain errors and route-level exception
+   mapping so each illegal transition returns a deterministic code.
+4. **Verification:** Re-ran approvals tests and full suite.
+5. **Outcome/Learning:** API now blocks illegal transitions with explicit
+   machine-readable errors.
+
+### Round 3 — Idempotency + Duplicate Resolution Semantics
+
+1. **Pattern Investigation:** Checked repeated approval calls and stale target
+   calls after later approvals appeared in the same run.
+2. **Failing Tests:** Added duplicate/stale scenarios requiring
+   `DUPLICATE_APPROVAL`.
+3. **Implementation:** Added resolution history checks before attempting
+   append, preserving idempotent behavior for already-resolved targets.
+4. **Verification:** Full suite run after targeted approvals run.
+5. **Outcome/Learning:** Duplicate transitions no longer mutate state and now
+   fail loudly with consistent error codes.
+
+### Round 4 — Data Integrity + Input Quality
+
+1. **Pattern Investigation:** Audited resolver metadata and request input
+   quality (`approver_id`) against business rules.
+2. **Failing Tests:** Added coverage for:
+   - whitespace-only `approver_id` rejection (`422`)
+   - inconsistent run state surfacing through pending endpoint (`409`)
+3. **Implementation:** Enforced non-blank `approver_id` using Pydantic
+   stripping + `min_length=1` and propagated projection inconsistency instead of
+   flattening to generic `500`.
+4. **Verification:** Full suite run.
+5. **Outcome/Learning:** Input boundaries became strict and inconsistency
+   handling stayed transparent.
+
+### Round 5 — Storage Failure + Timestamp Safety
+
+1. **Pattern Investigation:** Audited write-path failure handling and ordering
+   risks for synthetic approval resolution events.
+2. **Failing Tests:** Added resolution-append failure case expecting
+   `STORAGE_WRITE_ERROR`.
+3. **Implementation:** Wrapped append failures as `StorageWriteError` and
+   guarded `resolved_at` to be strictly after latest run timestamp to avoid
+   order collisions.
+4. **Verification:** Ran full suite after all fixes.
+5. **Outcome/Learning:** Resolution writes are now robust and keep deterministic
+   ordering guarantees.
+
+### ✅ Final Audit Summary
+
+- **Docs first:** API contract + error semantics documented in `spec/API.md`,
+  and local test instructions added in `docs/API_TESTING.md`.
+- **Code delivered:** new approval service, controller routes, store protocol
+  extension, typed errors, presenters, and exception handlers.
+- **Test status:** `95` tests passing (`./.venv/bin/pytest -q`).
+- **Issue #4 deployment-readiness decision:** **Ready** for merge/deploy scope.
+  The control surface is deterministic, fail-loud, and fully covered by
+  endpoint tests.
+
+---
+
 ## 🗓️ 2026-02-15: Issue #22 — Run Status Projection (5-Round Big Slik Cycle)
 
 ### 🎯 Objective

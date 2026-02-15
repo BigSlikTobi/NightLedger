@@ -1,8 +1,12 @@
 from typing import Any
 
 from nightledger_api.services.errors import (
+    AmbiguousEventIdError,
+    ApprovalNotFoundError,
+    DuplicateApprovalError,
     DuplicateEventError,
     InconsistentRunStateError,
+    NoPendingApprovalError,
     RunNotFoundError,
     SchemaValidationError,
     StorageReadError,
@@ -107,6 +111,74 @@ def present_inconsistent_run_state_error(exc: InconsistentRunStateError) -> dict
                     "message": exc.detail_message,
                     "type": exc.detail_type,
                     "code": exc.detail_code,
+                }
+            ],
+        }
+    }
+
+
+def present_approval_not_found_error(exc: ApprovalNotFoundError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "APPROVAL_NOT_FOUND",
+            "message": "Approval target not found",
+            "details": [
+                {
+                    "path": "event_id",
+                    "message": str(exc),
+                    "type": "not_found",
+                    "code": "APPROVAL_NOT_FOUND",
+                }
+            ],
+        }
+    }
+
+
+def present_ambiguous_event_id_error(exc: AmbiguousEventIdError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "AMBIGUOUS_EVENT_ID",
+            "message": "Event ID maps to multiple runs",
+            "details": [
+                {
+                    "path": "event_id",
+                    "message": str(exc),
+                    "type": "state_conflict",
+                    "code": "AMBIGUOUS_EVENT_ID",
+                }
+            ],
+        }
+    }
+
+
+def present_no_pending_approval_error(exc: NoPendingApprovalError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "NO_PENDING_APPROVAL",
+            "message": "No pending approval for target event",
+            "details": [
+                {
+                    "path": "event_id",
+                    "message": str(exc),
+                    "type": "state_conflict",
+                    "code": "NO_PENDING_APPROVAL",
+                }
+            ],
+        }
+    }
+
+
+def present_duplicate_approval_error(exc: DuplicateApprovalError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "DUPLICATE_APPROVAL",
+            "message": "Approval already resolved",
+            "details": [
+                {
+                    "path": "event_id",
+                    "message": str(exc),
+                    "type": "state_conflict",
+                    "code": "DUPLICATE_APPROVAL",
                 }
             ],
         }

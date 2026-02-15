@@ -47,6 +47,8 @@ We aren't just hacking; we're executing a vision. Check the specs:
 | **[The MVP Spec](./spec/MVP/MVP.md)**               | What we are building. The "Kano Model." |
 | **[Product Design](./spec/MVP/product_design.md)**  | How it works. The "Universal Schema."   |
 | **[THE ROADMAP](./spec/MVP/roadmap.md)**            | **What we are doing right now.**        |
+| **[API Draft](./spec/API.md)**                      | Runtime endpoint contracts + errors.    |
+| **[API Testing Guide](./docs/API_TESTING.md)**      | Local curl smoke checks for API flows.  |
 
 ---
 
