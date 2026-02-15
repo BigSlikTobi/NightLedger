@@ -79,3 +79,51 @@ def test_round5_architecture_docs_define_journal_representation_ownership() -> N
     assert "representation layer" in normalized
     assert "must not" in normalized
     assert "governance" in normalized
+
+
+def test_round1_api_testing_docs_include_journal_endpoint_curl_flow() -> None:
+    api_testing_md = _load("docs/API_TESTING.md")
+    normalized = api_testing_md.lower()
+
+    assert "journal endpoint smoke flow (issue #35)" in normalized
+    assert "curl -ss http://127.0.0.1:8001/v1/runs/run_approval_demo_1/journal" in normalized
+    assert "curl -ss http://127.0.0.1:8001/v1/runs/run_journal_unknown/journal" in normalized
+
+
+def test_round2_api_testing_docs_define_journal_response_fields() -> None:
+    api_testing_md = _load("docs/API_TESTING.md")
+    normalized = api_testing_md.lower()
+
+    assert "entry_id" in normalized
+    assert "payload_ref" in normalized
+    assert "approval_context" in normalized
+    assert "metadata" in normalized
+    assert "evidence_refs" in normalized
+    assert "approval_indicator" in normalized
+
+
+def test_round3_api_testing_docs_capture_journal_error_behavior() -> None:
+    api_testing_md = _load("docs/API_TESTING.md")
+    normalized = api_testing_md.lower()
+
+    assert "404 run_not_found" in normalized
+    assert "409 inconsistent_run_state" in normalized
+    assert "500 storage_read_error" in normalized
+
+
+def test_round4_demo_script_calls_out_journal_readability_and_traceability() -> None:
+    demo_script_md = _load("docs/DEMO_SCRIPT.md")
+    normalized = demo_script_md.lower()
+
+    assert "journal readability demo" in normalized
+    assert "evidence traceability demo" in normalized
+    assert "/v1/runs/{run_id}/journal" in demo_script_md
+
+
+def test_round5_demo_script_includes_before_and_after_approval_journal_checks() -> None:
+    demo_script_md = _load("docs/DEMO_SCRIPT.md")
+    normalized = demo_script_md.lower()
+
+    assert "before approval resolution" in normalized
+    assert "after approval resolution" in normalized
+    assert "approval_indicator" in normalized

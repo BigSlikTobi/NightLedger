@@ -105,9 +105,77 @@ Expected:
 - run status: `approved`
 - pending approvals no longer include the resolved target
 
+## Journal Endpoint Smoke Flow (Issue #35)
+
+The journal endpoint is the representation-layer projection for human-readable
+timeline review while preserving references back to append-only source events.
+
+### 1) Before approval resolution
+
+Run this immediately after creating the pending approval event in step 1 above
+(before resolving it):
+
+```bash
+curl -sS http://127.0.0.1:8001/v1/runs/run_approval_demo_1/journal
+```
+
+Expected:
+- `200 OK`
+- `entry_count >= 1`
+- latest entry includes `approval_context.status: "pending"`
+- latest entry includes `approval_indicator.is_approval_required: true`
+- latest entry includes `approval_indicator.is_approval_resolved: false`
+
+### 2) After approval resolution
+
+Run this after resolving the approval in step 3 above:
+
+```bash
+curl -sS http://127.0.0.1:8001/v1/runs/run_approval_demo_1/journal
+```
+
+Expected:
+- `200 OK`
+- includes the original `approval_requested` entry and a later
+  `approval_resolved` entry
+- resolved entry includes `approval_context.status: "approved"`
+- resolved entry includes non-null `approval_context.resolved_by` and
+  `approval_context.resolved_at`
+- resolved entry includes
+  `approval_indicator: {"is_approval_required": true, "is_approval_resolved": true, "decision": "approved"}`
+
+### 3) Journal response shape quick-check
+
+Validate these core fields on each entry:
+
+- identity and ordering: `entry_id`, `event_id`, `timestamp`
+- readability: `event_type`, `title`, `details`
+- evidence traceability to raw payload: `payload_ref.run_id`,
+  `payload_ref.event_id`, `payload_ref.path`
+- approval state projection: `approval_context`
+- machine context: `metadata.actor`, `metadata.confidence`,
+  `metadata.risk_level`, `metadata.integrity_warning`
+- evidence list when present: `evidence_refs`
+- approval transition marker when approval is relevant: `approval_indicator`
+
+### 4) Journal error behavior quick-check
+
+Unknown run:
+
+```bash
+curl -sS http://127.0.0.1:8001/v1/runs/run_journal_unknown/journal
+```
+
+Expected:
+- `404 RUN_NOT_FOUND`
+- error envelope has `error.code`, `error.message`, and `error.details[]`
+
+Other documented failure classes:
+- `409 INCONSISTENT_RUN_STATE` when stored run events are inconsistent or malformed.
+- `500 STORAGE_READ_ERROR` when the backing store fails on read.
+
 ## Full Regression Suite
 
 ```bash
 ./.venv/bin/pytest -q
 ```
-

@@ -8,6 +8,92 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-15: Issue #35 — Journal Endpoint Usage Docs (5-Round Big Slik Cycle)
+
+### 🎯 Objective
+
+Document practical usage of `GET /v1/runs/{run_id}/journal` in local API testing
+and demo operations, with explicit readability and evidence-traceability
+guidance that matches implemented contract semantics.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — API Testing Flow Coverage
+
+1. **Pattern Investigation:** `docs/API_TESTING.md` covered approval APIs but
+   had no runnable journal endpoint flow.
+2. **Failing Tests:** Added
+   `test_round1_api_testing_docs_include_journal_endpoint_curl_flow` to
+   `tests/test_journal_contract_docs.py`.
+3. **Implementation:** Added `Journal Endpoint Smoke Flow (Issue #35)` with
+   runnable curl commands for known and unknown runs.
+4. **Verification:** Targeted docs contract test passed after doc update.
+5. **Outcome/Learning:** Operator docs now include direct runbook commands for
+   journal projection checks.
+
+### Round 2 — Response Field Contract Clarity
+
+1. **Pattern Investigation:** API testing guide did not explain projected entry
+   field semantics.
+2. **Failing Tests:** Added
+   `test_round2_api_testing_docs_define_journal_response_fields`.
+3. **Implementation:** Documented expected entry fields:
+   `entry_id`, `payload_ref`, `approval_context`, `metadata`, `evidence_refs`,
+   and `approval_indicator`.
+4. **Verification:** Targeted docs contract test passed after doc update.
+5. **Outcome/Learning:** Docs now clearly connect human-readable timeline output
+   to traceable machine fields.
+
+### Round 3 — Error Behavior Alignment
+
+1. **Pattern Investigation:** Journal-specific error envelopes were not
+   represented in testing instructions.
+2. **Failing Tests:** Added
+   `test_round3_api_testing_docs_capture_journal_error_behavior`.
+3. **Implementation:** Added explicit expected outcomes for `404 RUN_NOT_FOUND`,
+   `409 INCONSISTENT_RUN_STATE`, and `500 STORAGE_READ_ERROR`.
+4. **Verification:** Targeted docs contract test passed after doc update.
+5. **Outcome/Learning:** Fail-loud behavior is now testable from docs with
+   concrete expected envelopes.
+
+### Round 4 — Demo Readability + Traceability Narration
+
+1. **Pattern Investigation:** `docs/DEMO_SCRIPT.md` remained a high-level draft
+   and did not explicitly frame readability and traceability checkpoints.
+2. **Failing Tests:** Added
+   `test_round4_demo_script_calls_out_journal_readability_and_traceability`.
+3. **Implementation:** Rewrote demo script with explicit sections for
+   "journal readability demo" and "evidence traceability demo" using
+   `/v1/runs/{run_id}/journal`.
+4. **Verification:** Targeted docs contract test passed after doc update.
+5. **Outcome/Learning:** Demo narrative now directly demonstrates the
+   representation layer value proposition.
+
+### Round 5 — Before/After Approval Transition Evidence
+
+1. **Pattern Investigation:** Draft demo flow did not clearly compare journal
+   state before vs after resolution.
+2. **Failing Tests:** Added
+   `test_round5_demo_script_includes_before_and_after_approval_journal_checks`.
+3. **Implementation:** Added explicit "before approval resolution" and
+   "after approval resolution" steps with `approval_indicator` interpretation.
+4. **Verification:** `tests/test_journal_contract_docs.py` passed end-to-end.
+5. **Outcome/Learning:** Demo now proves approval pause/resume behavior with
+   projected timeline evidence.
+
+### ✅ Final Audit Summary
+
+- **Docs delivered:** `docs/API_TESTING.md` and `docs/DEMO_SCRIPT.md` now include
+  practical journal endpoint runbook guidance.
+- **Contract guardrails added:** `tests/test_journal_contract_docs.py` now
+  enforces issue-35 doc acceptance criteria.
+- **Verification completed:** `./.venv/bin/pytest -q tests/test_journal_contract_docs.py`
+  passed (`11` tests).
+- **Known verification gap:** Full suite run (`./.venv/bin/pytest -q`) was
+  blocked in this environment due missing `httpx` and restricted network access
+  preventing dependency install.
+- **Issue #35 readiness decision:** **Ready** from a documentation scope
+  perspective; all targeted doc acceptance checks are green.
 ## 🗓️ 2026-02-15: Issue #33 — Journal Projection Fixture Coverage (5-Round Big Slik Cycle)
 
 ### 🎯 Objective
