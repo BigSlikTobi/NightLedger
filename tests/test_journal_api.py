@@ -226,3 +226,166 @@ def test_round5_get_run_journal_surfaces_inconsistent_state_for_invalid_payload(
     assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
     assert body["error"]["details"][0]["path"] == "payload"
     assert body["error"]["details"][0]["code"] == "INVALID_EVENT_PAYLOAD"
+
+
+def test_issue34_round1_get_run_journal_surfaces_approval_timeline_inconsistency() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    ingest(
+        build_event_payload(
+            event_id="evt_timeline_inconsistent",
+            run_id="run_timeline_inconsistent",
+            timestamp="2026-02-17T17:00:00Z",
+            event_type="approval_resolved",
+            title="Approval resolved",
+            details="Approval was resolved without approver identity",
+            requires_approval=True,
+            approval_status="approved",
+            requested_by="agent",
+            resolved_at="2026-02-17T17:00:00Z",
+            reason="policy exception",
+        )
+    )
+
+    response = client.get("/v1/runs/run_timeline_inconsistent/journal")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
+    assert body["error"]["details"][0]["code"] == "NO_PENDING_APPROVAL"
+
+
+def test_issue34_round2_get_run_journal_is_deterministically_ordered_for_realistic_run() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    ingest(
+        build_event_payload(
+            event_id="evt_order_late",
+            run_id="run_order_realistic",
+            timestamp="2026-02-17T18:01:00Z",
+            event_type="approval_resolved",
+            title="Approval resolved",
+            details="Human approved transfer",
+            requires_approval=True,
+            approval_status="approved",
+            requested_by="agent",
+            resolved_by="human_reviewer",
+            resolved_at="2026-02-17T18:01:00Z",
+            reason="within policy",
+        )
+    )
+    ingest(
+        build_event_payload(
+            event_id="evt_order_early",
+            run_id="run_order_realistic",
+            timestamp="2026-02-17T18:00:00Z",
+            event_type="approval_requested",
+            title="Approval required",
+            details="Transfer exceeds threshold",
+            requires_approval=True,
+            approval_status="pending",
+            requested_by="agent",
+            reason="Transfer exceeds threshold",
+        )
+    )
+
+    response = client.get("/v1/runs/run_order_realistic/journal")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["run_id"] == "run_order_realistic"
+    assert body["entry_count"] == 2
+    assert [entry["event_id"] for entry in body["entries"]] == [
+        "evt_order_early",
+        "evt_order_late",
+    ]
+    assert [entry["entry_id"] for entry in body["entries"]] == [
+        "jrnl_run_order_realistic_0001",
+        "jrnl_run_order_realistic_0002",
+    ]
+
+
+def test_issue34_round3_get_run_journal_unknown_run_uses_full_error_envelope() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    response = client.get("/v1/runs/run_issue34_unknown/journal")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {
+            "code": "RUN_NOT_FOUND",
+            "message": "Run not found",
+            "details": [
+                {
+                    "path": "run_id",
+                    "message": "No events found for run 'run_issue34_unknown'",
+                    "type": "not_found",
+                    "code": "RUN_NOT_FOUND",
+                }
+            ],
+        }
+    }
+
+
+def test_issue34_round4_get_run_journal_storage_failure_uses_full_error_envelope() -> None:
+    app.dependency_overrides[get_event_store] = lambda: _FailingJournalReadStore()
+
+    response = client.get("/v1/runs/run_issue34_storage_fail/journal")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "error": {
+            "code": "STORAGE_READ_ERROR",
+            "message": "Failed to load events",
+            "details": [
+                {
+                    "path": "storage",
+                    "message": "storage backend read failed",
+                    "type": "storage_failure",
+                    "code": "STORAGE_READ_FAILED",
+                }
+            ],
+        }
+    }
+
+
+def test_issue34_round5_get_run_journal_inconsistency_uses_full_error_envelope() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    ingest(
+        build_event_payload(
+            event_id="evt_issue34_inconsistent",
+            run_id="run_issue34_inconsistent",
+            timestamp="2026-02-17T19:00:00Z",
+            event_type="approval_resolved",
+            title="Approval resolved",
+            details="Resolved without prior pending request",
+            requires_approval=True,
+            approval_status="approved",
+            requested_by="agent",
+            resolved_at="2026-02-17T19:00:00Z",
+            reason="manual override",
+        )
+    )
+
+    response = client.get("/v1/runs/run_issue34_inconsistent/journal")
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "error": {
+            "code": "INCONSISTENT_RUN_STATE",
+            "message": "Run events contain inconsistent approval state",
+            "details": [
+                {
+                    "path": "approval",
+                    "message": "approval_resolved encountered without pending approval",
+                    "type": "state_conflict",
+                    "code": "NO_PENDING_APPROVAL",
+                }
+            ],
+        }
+    }
