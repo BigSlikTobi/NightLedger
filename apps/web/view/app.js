@@ -1,7 +1,7 @@
 import { createApp, computed, reactive } from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
-import { MOCK_EVENTS } from "./mock_data.js";
-import { toTimelineCards } from "./timeline_model.js";
-import { createTimelineController } from "./timeline_controller.js";
+import { MOCK_EVENTS } from "../model/mock_data.js";
+import { toTimelineCards } from "../model/timeline_model.js";
+import { createTimelineController } from "../controller/timeline_controller.js";
 
 function runIdFromLocation() {
   const url = new URL(window.location.href);
