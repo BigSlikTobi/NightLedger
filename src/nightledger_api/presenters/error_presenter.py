@@ -2,6 +2,8 @@ from typing import Any
 
 from nightledger_api.services.errors import (
     DuplicateEventError,
+    InconsistentRunStateError,
+    RunNotFoundError,
     SchemaValidationError,
     StorageReadError,
     StorageWriteError,
@@ -76,3 +78,36 @@ def present_duplicate_event_error(exc: DuplicateEventError) -> dict[str, Any]:
         }
     }
 
+
+def present_run_not_found_error(exc: RunNotFoundError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "RUN_NOT_FOUND",
+            "message": "Run not found",
+            "details": [
+                {
+                    "path": "run_id",
+                    "message": str(exc),
+                    "type": "not_found",
+                    "code": "RUN_NOT_FOUND",
+                }
+            ],
+        }
+    }
+
+
+def present_inconsistent_run_state_error(exc: InconsistentRunStateError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "INCONSISTENT_RUN_STATE",
+            "message": "Run events contain inconsistent approval state",
+            "details": [
+                {
+                    "path": exc.detail_path,
+                    "message": exc.detail_message,
+                    "type": exc.detail_type,
+                    "code": exc.detail_code,
+                }
+            ],
+        }
+    }
