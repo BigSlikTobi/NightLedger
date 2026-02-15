@@ -1,31 +1,36 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { renderTimeline } from "./journal.js";
+import { toTimelineCards } from "./timeline_model.js";
 
-test("renders loading fallback for bad payload", () => {
-  const html = renderTimeline(null);
-  assert.match(html, /Could not read timeline data/);
+test("returns empty list for bad payload", () => {
+  assert.deepEqual(toTimelineCards(null), []);
 });
 
-test("renders empty state", () => {
-  const html = renderTimeline([]);
-  assert.match(html, /No journal events/);
+test("sorts cards by timestamp ascending", () => {
+  const cards = toTimelineCards([
+    { title: "B", timestamp: "2026-02-15T11:00:00.000Z" },
+    { title: "A", timestamp: "2026-02-15T10:00:00.000Z" },
+  ]);
+
+  assert.equal(cards[0].title, "A");
+  assert.equal(cards[1].title, "B");
 });
 
-test("renders timeline cards with risk + approval + evidence", () => {
-  const html = renderTimeline([
+test("maps risk, approval and evidence metadata", () => {
+  const [card] = toTimelineCards([
     {
       title: "Spend request",
       summary: "Agent wants to buy API credits",
       timestamp: "2026-02-15T10:00:00.000Z",
-      risk_level: "high",
+      risk_level: "critical",
       approval_status: "required",
       evidence_links: ["https://example.com/proof"],
     },
   ]);
 
-  assert.match(html, /Spend request/);
-  assert.match(html, /card--risk/);
-  assert.match(html, /card--approval/);
-  assert.match(html, /https:\/\/example.com\/proof/);
+  assert.equal(card.riskLabel, "CRITICAL");
+  assert.equal(card.approvalLabel, "REQUIRED");
+  assert.equal(card.flags.isRisky, true);
+  assert.equal(card.flags.needsApproval, true);
+  assert.deepEqual(card.evidenceLinks, ["https://example.com/proof"]);
 });
