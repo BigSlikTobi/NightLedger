@@ -74,6 +74,26 @@ All commit messages must follow the
 - `test: add unit tests for risk calculator`
 - `chore: update dependencies`
 
+### 4. The "5-Round TDD & Audit" Protocol (The Big Slik Way)
+
+For complex core logic or storage optimizations, follow this iterative cycle:
+
+1. **Cycle (Repeat 5 Rounds):**
+   - **Pattern Investigation:** Audit existing code, tests, and specs to
+     identify the next atomic optimization or gap.
+   - **Failing Tests:** Write structured, failing tests that define the success
+     criteria for this round.
+   - **Implementation:** Write the minimal code needed to make the tests pass.
+   - **Verification:** Run the full test suite to ensure no regressions and
+     verify the new behavior.
+2. **Final Audit (End of Round 5):**
+   - Perform a comprehensive "Sanity Check" across all modified files and
+     related specs.
+   - Identify minor "Code Hygiene" items (unused imports, dead code, docstring
+     gaps).
+   - Resolve hygiene items and verify the complete suite one last time.
+3. **Execution:** Create a detailed PR and push to git.
+
 ## 🧠 Your Role
 
 You are not just a code generator; you are a **Systems Architect** and **Safety
