@@ -6,9 +6,11 @@ from nightledger_api.services.event_ingest_service import validate_event_payload
 from nightledger_api.services.event_store import EventStore, InMemoryAppendOnlyEventStore
 from nightledger_api.services.errors import (
     DuplicateEventError,
+    RunNotFoundError,
     StorageReadError,
     StorageWriteError,
 )
+from nightledger_api.services.run_status_service import project_run_status
 
 
 router = APIRouter()
@@ -36,8 +38,6 @@ def ingest_event(
         "integrity_warning": stored.integrity_warning,
     }
 
-
-
 @router.get("/v1/runs/{run_id}/events", status_code=status.HTTP_200_OK)
 def get_run_events(
     run_id: str, store: EventStore = Depends(get_event_store)
@@ -62,4 +62,26 @@ def get_run_events(
             }
             for event in events
         ],
+    }
+
+
+@router.get("/v1/runs/{run_id}/status", status_code=status.HTTP_200_OK)
+def get_run_status(
+    run_id: str, store: EventStore = Depends(get_event_store)
+) -> dict[str, Any]:
+    try:
+        events = store.list_by_run_id(run_id)
+    except StorageReadError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise StorageReadError("storage backend read failed") from exc
+
+    if not events:
+        raise RunNotFoundError(run_id=run_id)
+
+    projection = project_run_status(events)
+    return {
+        "run_id": run_id,
+        "status": projection.status,
+        "pending_approval": projection.pending_approval,
     }
