@@ -8,6 +8,89 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-15: Issue #34 — Journal API Integration Coverage (5-Round Big Slik Cycle)
+
+### 🎯 Objective
+
+Lock `GET /v1/runs/{run_id}/journal` behavior at the HTTP boundary with
+integration tests for happy path, deterministic ordering, and fail-loud error
+envelopes.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — Approval Timeline Inconsistency at API Boundary
+
+1. **Pattern Investigation:** Existing tests covered malformed payload/timestamp
+   inconsistency, but not approval timeline inconsistency projected through the
+   endpoint.
+2. **Failing Tests:** Added
+   `test_issue34_round1_get_run_journal_surfaces_approval_timeline_inconsistency`
+   in `tests/test_journal_api.py`.
+3. **Implementation:** Added approval timeline consistency guard in journal
+   route by reusing `project_run_status(events)` before returning projection.
+4. **Verification:** Targeted round test passed, then full suite passed.
+5. **Outcome/Learning:** Journal endpoint now surfaces approval state-machine
+   inconsistencies as `409 INCONSISTENT_RUN_STATE`.
+
+### Round 2 — Deterministic Order with Realistic Run Data
+
+1. **Pattern Investigation:** Happy-path test only covered one event and did
+   not prove deterministic order on realistic approval flow data.
+2. **Failing Tests:** Added
+   `test_issue34_round2_get_run_journal_is_deterministically_ordered_for_realistic_run`.
+3. **Implementation:** Test-only hardening; endpoint behavior already satisfied
+   ordering contract.
+4. **Verification:** Targeted round test passed, then full suite passed.
+5. **Outcome/Learning:** Ordering is now explicitly locked for out-of-order
+   ingestion scenarios at the HTTP layer.
+
+### Round 3 — Full Unknown-Run Envelope Contract
+
+1. **Pattern Investigation:** Unknown-run assertions were partial (`code/path`)
+   and could miss envelope drift.
+2. **Failing Tests:** Added
+   `test_issue34_round3_get_run_journal_unknown_run_uses_full_error_envelope`.
+3. **Implementation:** Test-only hardening; behavior already matched contract.
+4. **Verification:** Targeted round test passed, then full suite passed.
+5. **Outcome/Learning:** Unknown-run error envelope is now guarded end-to-end
+   (status, message, path, type, code).
+
+### Round 4 — Full Storage Failure Envelope Contract
+
+1. **Pattern Investigation:** Storage-read failure assertions were also partial.
+2. **Failing Tests:** Added
+   `test_issue34_round4_get_run_journal_storage_failure_uses_full_error_envelope`.
+3. **Implementation:** Test-only hardening; behavior already matched contract.
+4. **Verification:** Targeted round test passed, then full suite passed.
+5. **Outcome/Learning:** `500 STORAGE_READ_ERROR` envelope is now fully locked.
+
+### Round 5 — Full Inconsistent-State Envelope Contract
+
+1. **Pattern Investigation:** Inconsistency tests did not assert complete error
+   envelope semantics for approval timeline failures.
+2. **Failing Tests:** Added
+   `test_issue34_round5_get_run_journal_inconsistency_uses_full_error_envelope`.
+3. **Implementation:** Test-only hardening; behavior already matched contract
+   after Round 1 wiring change.
+4. **Verification:** `tests/test_journal_api.py` passed end-to-end, then full
+   suite passed.
+5. **Outcome/Learning:** `409 INCONSISTENT_RUN_STATE` envelope contract is now
+   explicitly protected against regression.
+
+### ✅ Final Audit Summary
+
+- **HTTP coverage expanded:** journal endpoint integration tests now include
+  realistic deterministic ordering and full envelope assertions for all key
+  failure modes.
+- **Controller hardening delivered:** journal endpoint now reuses status
+  projection to fail loud on approval timeline inconsistencies.
+- **Validation completed:**
+  - `./.venv/bin/pytest -q tests/test_journal_api.py`
+  - `./.venv/bin/pytest -q`
+- **Final verification:** `126` tests passing.
+- **Issue #34 readiness decision:** **Ready** for merge; API boundary contract
+  coverage is complete and stable.
+
 ## 🗓️ 2026-02-15: Issue #35 — Journal Endpoint Usage Docs (5-Round Big Slik Cycle)
 
 ### 🎯 Objective
