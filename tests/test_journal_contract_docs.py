@@ -46,3 +46,14 @@ def test_round3_journal_endpoint_defines_deterministic_order_and_tiebreak() -> N
     assert "deterministic projection semantics:" in normalized
     assert "timestamp" in normalized and "ascending" in normalized
     assert "append sequence" in normalized
+
+
+def test_round4_journal_endpoint_includes_explicit_error_envelope_examples() -> None:
+    api_md = _load("spec/API.md")
+    journal = _section(api_md, "GET /v1/runs/{run_id}/journal")
+
+    assert "Unknown run error response (v0 draft):" in journal
+    assert "Inconsistent state error response (v0 draft):" in journal
+    assert "Storage read error response (v0 draft):" in journal
+    assert "\"error\"" in journal
+    assert "\"details\"" in journal

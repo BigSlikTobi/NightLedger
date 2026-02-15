@@ -285,6 +285,63 @@ Deterministic projection semantics:
 - Entries are sorted by source event `timestamp` ascending.
 - Timestamp ties are resolved by append sequence ascending.
 
+Unknown run error response (v0 draft):
+
+```json
+{
+  "error": {
+    "code": "RUN_NOT_FOUND",
+    "message": "Run not found",
+    "details": [
+      {
+        "path": "run_id",
+        "message": "No events found for run 'run_123'",
+        "type": "not_found",
+        "code": "RUN_NOT_FOUND"
+      }
+    ]
+  }
+}
+```
+
+Inconsistent state error response (v0 draft):
+
+```json
+{
+  "error": {
+    "code": "INCONSISTENT_RUN_STATE",
+    "message": "Run events contain inconsistent approval state",
+    "details": [
+      {
+        "path": "approval",
+        "message": "approval_resolved encountered without pending approval",
+        "type": "state_conflict",
+        "code": "NO_PENDING_APPROVAL"
+      }
+    ]
+  }
+}
+```
+
+Storage read error response (v0 draft):
+
+```json
+{
+  "error": {
+    "code": "STORAGE_READ_ERROR",
+    "message": "Failed to load events",
+    "details": [
+      {
+        "path": "storage",
+        "message": "storage backend read failed",
+        "type": "storage_failure",
+        "code": "STORAGE_READ_FAILED"
+      }
+    ]
+  }
+}
+```
+
 ## POST /v1/approvals/:eventId
 
 Resolve pending approval.
