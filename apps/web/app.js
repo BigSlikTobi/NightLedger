@@ -1,60 +1,62 @@
-import { createApp, computed, ref } from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
+import { createApp, computed, reactive } from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
 import { MOCK_EVENTS } from "./mock_data.js";
 import { toTimelineCards } from "./timeline_model.js";
+import { createTimelineController } from "./timeline_controller.js";
 
 function runIdFromLocation() {
   const url = new URL(window.location.href);
   return url.searchParams.get("runId") || "demo";
 }
 
+function fetchJournalEvents(runId) {
+  return fetch(`/v1/runs/${encodeURIComponent(runId)}/journal`).then(async (res) => {
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    const body = await res.json();
+    return body.events ?? body.journal ?? [];
+  });
+}
+
 createApp({
   setup() {
-    const runId = ref(runIdFromLocation());
-    const status = ref("loading");
-    const error = ref("");
-    const events = ref([]);
+    const state = reactive({
+      runId: runIdFromLocation(),
+      status: "idle",
+      error: "",
+      events: [],
+    });
 
-    const cards = computed(() => toTimelineCards(events.value));
-    const isDemo = computed(() => runId.value === "demo");
+    const cards = computed(() => toTimelineCards(state.events));
+    const isDemo = computed(() => state.runId === "demo");
 
-    async function loadJournal() {
-      status.value = "loading";
-      error.value = "";
-
-      if (isDemo.value) {
+    const controller = createTimelineController({
+      runId: state.runId,
+      getDemoEvents: async () => {
         await new Promise((resolve) => setTimeout(resolve, 350));
-        events.value = MOCK_EVENTS;
-        status.value = "success";
-        return;
-      }
+        return MOCK_EVENTS;
+      },
+      getJournalEvents: fetchJournalEvents,
+      onState: (next) => {
+        state.status = next.status;
+        state.error = next.error;
+        state.events = next.events;
+      },
+    });
 
-      try {
-        const res = await fetch(`/v1/runs/${encodeURIComponent(runId.value)}/journal`);
-        if (!res.ok) throw new Error(`Request failed (${res.status})`);
-        const body = await res.json();
-        events.value = body.events ?? body.journal ?? [];
-        status.value = "success";
-      } catch (err) {
-        status.value = "error";
-        error.value = err?.message ?? "Unknown error";
-      }
-    }
+    controller.load();
 
-    loadJournal();
-
-    return { runId, status, error, cards, isDemo };
+    return { state, cards, isDemo };
   },
   template: `
     <main>
       <header>
         <h1>Run Timeline<span v-if="isDemo"> (Demo)</span></h1>
-        <p class="muted">Run: <code>{{ runId }}</code></p>
+        <p class="muted">Run: <code>{{ state.runId }}</code></p>
       </header>
 
-      <div v-if="status === 'loading'" class="state">Loading timeline for <code>{{ runId }}</code>...</div>
+      <div v-if="state.status === 'loading'" class="state">Loading timeline for <code>{{ state.runId }}</code>...</div>
 
-      <div v-else-if="status === 'error'" class="state state--error">
-        Could not load journal timeline. {{ error }}
+      <div v-else-if="state.status === 'error'" class="state state--error">
+        Could not load journal timeline. {{ state.error }}
       </div>
 
       <div v-else-if="cards.length === 0" class="state">No journal events for this run yet.</div>
