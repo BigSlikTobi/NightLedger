@@ -53,7 +53,7 @@ export function createTimelineController({
     }
   }
 
-  async function submitApprovalDecision(eventId, decision) {
+  async function submitApprovalDecision(eventId, decision, context = {}) {
     const isKnownPending = state.pendingApprovals.some((item) => item.event_id === eventId);
     if (!isKnownPending) {
       state.pendingError = "Approval is no longer pending.";
@@ -68,7 +68,7 @@ export function createTimelineController({
     emit();
 
     try {
-      await resolveApproval(eventId, decision);
+      await resolveApproval(eventId, decision, context);
       state.pendingApprovals = state.pendingApprovals.filter((item) => item.event_id !== eventId);
       emit();
     } catch (err) {

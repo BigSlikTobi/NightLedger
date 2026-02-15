@@ -24,11 +24,14 @@ function fetchPendingApprovals() {
   });
 }
 
-function postApprovalDecision(eventId, decision) {
+function postApprovalDecision(eventId, decision, context = {}) {
+  const approverId = context.approverId || "human_approver";
+  const reason = context.reason;
+
   return fetch(`/v1/approvals/${encodeURIComponent(eventId)}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ decision }),
+    body: JSON.stringify({ decision, approver_id: approverId, reason }),
   }).then(async (res) => {
     if (!res.ok) throw new Error(`Request failed (${res.status})`);
     return res.json().catch(() => ({}));
@@ -75,11 +78,11 @@ createApp({
     controller.loadPendingApprovals();
 
     function onApprove(eventId) {
-      return controller.submitApprovalDecision(eventId, "approved");
+      return controller.submitApprovalDecision(eventId, "approved", { approverId: "human_approver" });
     }
 
     function onReject(eventId) {
-      return controller.submitApprovalDecision(eventId, "rejected");
+      return controller.submitApprovalDecision(eventId, "rejected", { approverId: "human_approver" });
     }
 
     return { state, cards, isDemo, onApprove, onReject };
