@@ -58,3 +58,43 @@ Iterations completed:
 4. artifact cleanup.
 
 Overall progress: strong. The timeline is now in a modern framework, demo mode remains easy to use, tests validate core behavior, and the branch is cleaner and easier to evolve.
+
+## 2026-02-15 — MVC follow-up and communication correction
+
+After the first refactor, I received the explicit direction to move the frontend into an MVC style and to follow the updated `agents.md` from `main` with the full cycle discipline.
+
+I had a communication gap during execution. That was a process failure on my side, and I corrected it by resuming with a complete cycle and immediate push.
+
+### Full cycle completed (not just red tests)
+
+1. Goal re-read
+   I re-read the request: keep Vue, but split responsibilities in MVC form and preserve demo/runtime behavior.
+
+2. Pattern investigation
+   I inspected `app.js` and identified orchestration logic mixed into the view setup. This was the main separation gap.
+
+3. Failing tests
+   I added controller-level tests in `timeline_controller.test.js` for two core orchestration behaviors:
+   - demo run loads local data and reaches success state,
+   - API failure moves state to error with readable message.
+
+4. Minimal implementation
+   I created `timeline_controller.js` and moved loading/orchestration logic there. `app.js` now acts as the view binding layer and delegates state transitions to the controller.
+
+5. Verification
+   I ran the full web test suite (`npm test` in `apps/web`) and confirmed all tests pass, including the new controller tests.
+
+### Findings and iterations
+
+- Finding: framework alone was not enough; orchestration had to be extracted to make the architecture truly maintainable.
+- Finding: controller tests made state transitions explicit and less fragile.
+- Iteration: rebased remote branch updates, resolved script conflicts, reran tests, and pushed cleanly.
+
+### Result
+
+The FE now follows a clearer MVC-style split:
+- Model: `timeline_model.js`
+- Controller: `timeline_controller.js`
+- View: Vue app in `app.js`
+
+And the branch includes the incremental commits for test-first controller introduction, controller integration, and verification.
