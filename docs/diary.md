@@ -8,6 +8,90 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-15: Issue #32 — Journal Endpoint Wiring (5-Round Big Slik Cycle)
+
+### 🎯 Objective
+
+Expose journal projection through `GET /v1/runs/{run_id}/journal` with
+deterministic output and fail-loud error behavior consistent with existing API
+patterns.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — Baseline Endpoint Wiring
+
+1. **Pattern Investigation:** Confirmed journal projection service existed but
+   controller route was missing.
+2. **Failing Tests:** Added
+   `test_round1_get_run_journal_returns_projection_for_known_run` in
+   `tests/test_journal_api.py`.
+3. **Implementation:** Wired `GET /v1/runs/{run_id}/journal` in
+   `events_controller`, loading run events and returning
+   `project_run_journal(...).to_dict()`.
+4. **Verification:** Targeted journal API test passed, then full suite passed.
+5. **Outcome/Learning:** Known-run journal projection became consumable over
+   HTTP.
+
+### Round 2 — Unknown Run Semantics
+
+1. **Pattern Investigation:** Unknown runs returned `200` with empty projection,
+   which violated the contract.
+2. **Failing Tests:** Added
+   `test_round2_get_run_journal_returns_not_found_for_unknown_run`.
+3. **Implementation:** Raised `RunNotFoundError` when no run events exist.
+4. **Verification:** Targeted test passed, then full suite passed.
+5. **Outcome/Learning:** Endpoint now has explicit `404 RUN_NOT_FOUND`
+   semantics.
+
+### Round 3 — Storage Read Fail-Loud Wrapping
+
+1. **Pattern Investigation:** Generic backend read faults bubbled as unhandled
+   exceptions.
+2. **Failing Tests:** Added
+   `test_round3_get_run_journal_surfaces_storage_read_error` using a store that
+   raises generic runtime errors.
+3. **Implementation:** Added `StorageReadError` defensive wrapper in journal
+   route, matching other endpoints.
+4. **Verification:** Targeted test passed, then full suite passed.
+5. **Outcome/Learning:** Read-path failures are now consistently mapped to
+   `500 STORAGE_READ_ERROR`.
+
+### Round 4 — Corrupt Timestamp Record Handling
+
+1. **Pattern Investigation:** Malformed store records (`timestamp` not datetime)
+   produced unstructured crashes.
+2. **Failing Tests:** Added
+   `test_round4_get_run_journal_surfaces_inconsistent_state_for_invalid_timestamp`.
+3. **Implementation:** Added projector validation to raise
+   `InconsistentRunStateError` with `INVALID_EVENT_TIMESTAMP`.
+4. **Verification:** Targeted test passed, then full suite passed.
+5. **Outcome/Learning:** Corrupt timestamp data now fails loudly as
+   `409 INCONSISTENT_RUN_STATE`.
+
+### Round 5 — Corrupt Payload Record Handling
+
+1. **Pattern Investigation:** Non-object payload values still crashed during
+   projection.
+2. **Failing Tests:** Added
+   `test_round5_get_run_journal_surfaces_inconsistent_state_for_invalid_payload`.
+3. **Implementation:** Added payload-shape guard in projector to raise
+   `InconsistentRunStateError` with `INVALID_EVENT_PAYLOAD`.
+4. **Verification:** Targeted test passed, journal API suite passed, then full
+   suite passed.
+5. **Outcome/Learning:** Endpoint remains deterministic and transparent even for
+   malformed storage records.
+
+### ✅ Final Audit Summary
+
+- **Controller delivery:** `GET /v1/runs/{run_id}/journal` added and wired to
+  pure projection service.
+- **Fail-loud coverage:** Explicit handling for unknown run, storage read
+  failures, invalid timestamps, and invalid payloads.
+- **Tests added:** Dedicated endpoint suite in `tests/test_journal_api.py`.
+- **Final verification:** `111` tests passing (`./.venv/bin/pytest -q`).
+- **Issue #32 readiness decision:** **Ready** for merge; acceptance criteria
+  met with representation-only behavior and structured failure envelopes.
+
 ## 🗓️ 2026-02-15: Issue #31 — Journal Projection Service (5-Round Big Slik Cycle)
 
 ### 🎯 Objective

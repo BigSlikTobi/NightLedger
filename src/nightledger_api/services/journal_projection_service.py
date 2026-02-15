@@ -100,6 +100,13 @@ def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournal
                 detail_code="CROSS_RUN_EVENT_STREAM",
                 detail_type="state_conflict",
             )
+        if not isinstance(event.timestamp, datetime):
+            raise InconsistentRunStateError(
+                detail_path="timestamp",
+                detail_message="event timestamp must be a timezone-aware datetime",
+                detail_code="INVALID_EVENT_TIMESTAMP",
+                detail_type="state_conflict",
+            )
         if last_timestamp is not None and event.timestamp < last_timestamp:
             raise InconsistentRunStateError(
                 detail_path="timestamp",
@@ -110,7 +117,15 @@ def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournal
         last_timestamp = event.timestamp
 
         payload = event.payload
-        approval = payload.get("approval", {})
+        if not isinstance(payload, dict):
+            raise InconsistentRunStateError(
+                detail_path="payload",
+                detail_message="event payload must be an object",
+                detail_code="INVALID_EVENT_PAYLOAD",
+                detail_type="state_conflict",
+            )
+        approval_raw = payload.get("approval", {})
+        approval = approval_raw if isinstance(approval_raw, dict) else {}
 
         entries.append(
             JournalEntry(
