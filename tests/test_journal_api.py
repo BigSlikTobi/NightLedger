@@ -133,3 +133,24 @@ def test_round2_get_run_journal_returns_not_found_for_unknown_run() -> None:
     body = response.json()
     assert body["error"]["code"] == "RUN_NOT_FOUND"
     assert body["error"]["details"][0]["path"] == "run_id"
+
+
+class _FailingJournalReadStore:
+    def append(self, event: Any) -> Any:
+        _ = event
+        raise RuntimeError("append should not be called")
+
+    def list_by_run_id(self, run_id: str) -> list[Any]:
+        _ = run_id
+        raise RuntimeError("unexpected backend failure")
+
+
+def test_round3_get_run_journal_surfaces_storage_read_error() -> None:
+    app.dependency_overrides[get_event_store] = lambda: _FailingJournalReadStore()
+
+    response = client.get("/v1/runs/run_journal_fail/journal")
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "STORAGE_READ_ERROR"
+    assert body["error"]["details"][0]["code"] == "STORAGE_READ_FAILED"

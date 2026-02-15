@@ -107,7 +107,13 @@ def get_run_status(
 def get_run_journal(
     run_id: str, store: EventStore = Depends(get_event_store)
 ) -> dict[str, Any]:
-    events = store.list_by_run_id(run_id)
+    try:
+        events = store.list_by_run_id(run_id)
+    except StorageReadError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise StorageReadError("storage backend read failed") from exc
+
     if not events:
         raise RunNotFoundError(run_id=run_id)
     projection = project_run_journal(run_id=run_id, events=events)
