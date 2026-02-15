@@ -78,11 +78,11 @@ createApp({
     controller.loadPendingApprovals();
 
     function onApprove(eventId) {
-      return controller.submitApprovalDecision(eventId, "approved", { approverId: "human_approver" });
+      return controller.submitApprovalDecision(eventId, "approved");
     }
 
     function onReject(eventId) {
-      return controller.submitApprovalDecision(eventId, "rejected", { approverId: "human_approver" });
+      return controller.submitApprovalDecision(eventId, "rejected");
     }
 
     return { state, cards, isDemo, onApprove, onReject };
