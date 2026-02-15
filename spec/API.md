@@ -229,9 +229,16 @@ Storage read error response (v0 draft):
 }
 ```
 
-## GET /v1/runs/:runId/journal
+## GET /v1/runs/{run_id}/journal
 
 Return rendered journal entries.
+
+Behavior:
+
+- Existing run with consistent event stream: `200 OK`
+- Unknown run: `404 Not Found` / `RUN_NOT_FOUND`
+- Inconsistent state projection: `409 Conflict` / `INCONSISTENT_RUN_STATE`
+- Storage read failure: `500 Internal Server Error` / `STORAGE_READ_ERROR`
 
 ## POST /v1/approvals/:eventId
 
