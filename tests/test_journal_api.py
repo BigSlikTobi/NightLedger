@@ -9,7 +9,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
 from nightledger_api.controllers.events_controller import get_event_store  # noqa: E402
 from nightledger_api.main import app  # noqa: E402
-from nightledger_api.services.event_store import InMemoryAppendOnlyEventStore  # noqa: E402
+from nightledger_api.services.event_store import InMemoryAppendOnlyEventStore, StoredEvent  # noqa: E402
 
 client = TestClient(app)
 
@@ -154,3 +154,45 @@ def test_round3_get_run_journal_surfaces_storage_read_error() -> None:
     body = response.json()
     assert body["error"]["code"] == "STORAGE_READ_ERROR"
     assert body["error"]["details"][0]["code"] == "STORAGE_READ_FAILED"
+
+
+class _InvalidTimestampJournalStore:
+    def append(self, event: Any) -> Any:
+        _ = event
+        raise RuntimeError("append should not be called")
+
+    def list_by_run_id(self, run_id: str) -> list[Any]:
+        return [
+            StoredEvent(
+                id="evt_invalid_ts",
+                timestamp="not-a-datetime",  # type: ignore[arg-type]
+                run_id=run_id,
+                payload={
+                    "id": "evt_invalid_ts",
+                    "run_id": run_id,
+                    "timestamp": "2026-02-17T15:00:00Z",
+                    "type": "action",
+                    "actor": "agent",
+                    "title": "Invalid timestamp source",
+                    "details": "store returned malformed timestamp",
+                    "confidence": 0.8,
+                    "risk_level": "low",
+                    "requires_approval": False,
+                    "approval": {"status": "not_required"},
+                    "evidence": [],
+                },
+                integrity_warning=False,
+            )
+        ]
+
+
+def test_round4_get_run_journal_surfaces_inconsistent_state_for_invalid_timestamp() -> None:
+    app.dependency_overrides[get_event_store] = lambda: _InvalidTimestampJournalStore()
+
+    response = client.get("/v1/runs/run_invalid_ts/journal")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
+    assert body["error"]["details"][0]["path"] == "timestamp"
+    assert body["error"]["details"][0]["code"] == "INVALID_EVENT_TIMESTAMP"
