@@ -11,6 +11,20 @@
 - `apps/web/timeline_model.js` converts raw journal payloads into display-safe card models.
 - `apps/web/mock_data.js` provides demo data when no backend is available (`?runId=demo`).
 - `apps/web/journal.test.js` covers the model transformation (empty/error/risk+approval/evidence states).
+## Backend Structure (Modified MVC)
+- Controllers (`src/nightledger_api/controllers`):
+  - HTTP boundary only (routing, request/response codes, no business rules).
+- Models (`src/nightledger_api/models`):
+  - Event schema/domain types and validation contracts.
+- Services (`src/nightledger_api/services`):
+  - Governance and use-case logic (capture/gate rules, state transitions).
+- Presenters (`src/nightledger_api/presenters`):
+  - Deterministic API response shaping (especially error envelopes and projections).
+
+This maps MVC onto NightLedger's separation-of-concerns model:
+- Capture Layer: controller + schema validation entrypoint.
+- Governance Layer: service logic (no UI concerns).
+- Representation Layer: presenter/projection modules (read models only).
 
 ## Data Shape
 - Event stream per run (`run_id` partition)
