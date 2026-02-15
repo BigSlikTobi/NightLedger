@@ -76,22 +76,33 @@ All commit messages must follow the
 
 ### 4. The "5-Round TDD & Audit" Protocol (The Big Slik Way)
 
-For complex core logic or storage optimizations, follow this iterative cycle:
+Always follow autonomously follow this iterative cycle form start to finish:
 
-1. **Cycle (Repeat 5 Rounds):**
-   - **Pattern Investigation:** Audit existing code, tests, and specs to
-     identify the next atomic optimization or gap.
+> [!IMPORTANT]
+> **No Pre-Planning:** Do **not** plan all 5 rounds upfront. Each round's
+> execution plan is created **only after** the previous round is fully complete.
+> The findings from round N inform the plan for round N+1.
+
+1. **Cycle (Repeat 5 Rounds, one at a time):**
+   - **Goal Re-Read:** Re-read the original issue / goal description to maintain
+     full context of _what_ we are trying to achieve and _why_.
+   - **Pattern Investigation:** Audit existing code, tests, and specs **against
+     the goal** to identify the next atomic optimization or gap. Ask: _"What
+     does the goal require that is not yet implemented or tested?"_
    - **Failing Tests:** Write structured, failing tests that define the success
      criteria for this round.
    - **Implementation:** Write the minimal code needed to make the tests pass.
    - **Verification:** Run the full test suite to ensure no regressions and
      verify the new behavior.
-2. **Final Audit (End of Round 5):**
-   - Perform a comprehensive "Sanity Check" across all modified files and
-     related specs.
-   - Identify minor "Code Hygiene" items (unused imports, dead code, docstring
-     gaps).
-   - Resolve hygiene items and verify the complete suite one last time.
+2. **Final Audit — Goal Reconciliation (End of Round 5):**
+   - **Goal-vs-Implementation Check:** Re-read the original issue / goal one
+     final time and systematically compare every requirement, acceptance
+     criterion, and edge case against the current implementation. Flag any gaps,
+     partial implementations, or deviations.
+   - **Code Hygiene:** Identify minor items (unused imports, dead code,
+     docstring gaps) and resolve them.
+   - **Final Verification:** Run the complete test suite one last time to
+     confirm everything is green.
 3. **Execution:** Create a detailed PR and push to git.
 
 ## 🧠 Your Role
