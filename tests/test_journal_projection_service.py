@@ -22,6 +22,7 @@ def _stored_event(
     resolved_by: str | None = None,
     resolved_at: str | None = None,
     reason: str | None = None,
+    evidence: list[dict[str, str]] | None = None,
 ) -> StoredEvent:
     return StoredEvent(
         id=event_id,
@@ -45,7 +46,7 @@ def _stored_event(
                 "resolved_at": resolved_at,
                 "reason": reason,
             },
-            "evidence": [],
+            "evidence": evidence or [],
         },
         integrity_warning=False,
     )
@@ -95,3 +96,33 @@ def test_round1_project_run_journal_maps_baseline_readable_entry() -> None:
             }
         ],
     }
+
+
+def test_round2_project_run_journal_includes_evidence_references() -> None:
+    projection = project_run_journal(
+        run_id="run_journal_evidence",
+        events=[
+            _stored_event(
+                event_id="evt_journal_evidence",
+                run_id="run_journal_evidence",
+                timestamp="2026-02-17T10:00:00Z",
+                event_type="observation",
+                title="Collected evidence",
+                details="Agent captured execution artifacts",
+                evidence=[
+                    {"kind": "log", "label": "Runtime log", "ref": "log://run/1"},
+                    {
+                        "kind": "artifact",
+                        "label": "Output bundle",
+                        "ref": "artifact://bundle/abc",
+                    },
+                ],
+            )
+        ],
+    )
+
+    body = projection.to_dict()
+    assert body["entries"][0]["evidence_refs"] == [
+        {"kind": "log", "label": "Runtime log", "ref": "log://run/1"},
+        {"kind": "artifact", "label": "Output bundle", "ref": "artifact://bundle/abc"},
+    ]

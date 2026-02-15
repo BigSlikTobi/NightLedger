@@ -50,9 +50,10 @@ class JournalEntry:
     details: str
     payload_ref: PayloadRef
     approval_context: ApprovalContext
+    evidence_refs: list[dict[str, str]]
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        body: dict[str, Any] = {
             "entry_id": self.entry_id,
             "event_id": self.event_id,
             "timestamp": self.timestamp,
@@ -62,6 +63,9 @@ class JournalEntry:
             "payload_ref": self.payload_ref.to_dict(),
             "approval_context": self.approval_context.to_dict(),
         }
+        if self.evidence_refs:
+            body["evidence_refs"] = self.evidence_refs
+        return body
 
 
 @dataclass(frozen=True)
@@ -115,6 +119,7 @@ def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournal
                     resolved_at=_optional_timestamp_string(approval.get("resolved_at")),
                     reason=_optional_string(approval.get("reason")),
                 ),
+                evidence_refs=_evidence_refs(payload.get("evidence")),
             )
         )
 
@@ -150,6 +155,24 @@ def _optional_timestamp_string(value: Any) -> str | None:
     if isinstance(value, str):
         return value
     return str(value)
+
+
+def _evidence_refs(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+
+    refs: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        refs.append(
+            {
+                "kind": _string(item.get("kind")),
+                "label": _string(item.get("label")),
+                "ref": _string(item.get("ref")),
+            }
+        )
+    return refs
 
 
 def _format_timestamp(value: datetime) -> str:
