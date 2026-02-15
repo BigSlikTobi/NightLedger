@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test journal.test.js",
+    "test": "node --test *.test.js",
     "start": "npx serve ."
   }
 }
