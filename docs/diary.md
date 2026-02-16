@@ -8,6 +8,124 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-16: Issue #53 follow-up — SOTA hardening pass
+
+### 🎯 Objective
+
+Apply post-audit hardening for timing precision, test stability, and
+verification-artifact maintainability.
+
+### What was changed
+
+- Updated approval timing calculation in
+  `src/nightledger_api/services/approval_service.py` to use conservative
+  millisecond ceiling via `_elapsed_ms_ceiling`, preventing boundary
+  under-reporting.
+- Strengthened timing tests in
+  `tests/test_triage_inbox_orchestration_api.py`:
+  - removed brittle assumption that `within_target` is always `true`
+  - added deterministic rounding test using patched monotonic timer ticks to
+    prove `1000.1ms -> 1001ms` and `within_target=false`
+- Strengthened artifact governance in
+  `docs/artifacts/issue-53/triage_inbox_verification.md` by adding explicit
+  contract assertions and regeneration commands.
+- Added docs guardrail test in `tests/test_demo_setup_docs.py` to enforce the
+  presence of contract assertions + refresh path.
+- Updated timing semantics docs in `spec/API.md` and verification expectations
+  in `docs/API_TESTING.md`.
+
+### Validation
+
+- `./.venv/bin/pytest -q` (`142 passed`)
+- `npm --prefix apps/web test` (`10 passed`)
+
+## 🗓️ 2026-02-16: Issue #53 — Integration demo end-to-end verification + MVP timing checks (5-Round cycle)
+
+### 🎯 Objective
+
+Add explicit, testable verification for the `triage_inbox` end-to-end approval
+flow, validate approval-to-state-update MVP timing behavior, and publish
+reviewable verification artifacts.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — API timing receipt contract
+
+1. **Goal Re-Read:** Confirmed #53 requires objective timing verification, not
+   implicit assumptions.
+2. **Pattern Investigation:** Approval API response exposed orchestration and
+   status but had no explicit timing receipt.
+3. **Failing Tests:** Added
+   `test_issue53_round1_approval_resolution_reports_mvp_timing_receipt`.
+4. **Implementation:** Added `timing` block to approval-resolution response:
+   `target_ms`, `approval_to_state_update_ms`, `within_target`; updated
+   `spec/API.md` and `docs/API_TESTING.md` first.
+5. **Verification:** Full suite green (`136 passed` + web tests passing).
+
+### Round 2 — Deterministic orchestration timing gap
+
+1. **Goal Re-Read:** Confirmed timing evidence must prove transition behavior
+   in append-only receipts, not only request runtime.
+2. **Pattern Investigation:** No explicit value exposed for deterministic gap
+   between `approval_resolved` and terminal orchestration receipt.
+3. **Failing Tests:** Added
+   `test_issue53_round2_triage_inbox_reports_deterministic_orchestration_gap`.
+4. **Implementation:** Added
+   `timing.orchestration_receipt_gap_ms` (canonical `triage_inbox` flow => `2`
+   ms; otherwise `null`) and documented contract updates.
+5. **Verification:** Full suite green (`137 passed` + web tests passing).
+
+### Round 3 — Explicit transition semantics in timing receipt
+
+1. **Goal Re-Read:** Confirmed verification should be operator-readable without
+   inferring state changes from multiple fields.
+2. **Pattern Investigation:** Timing block lacked explicit source/target state
+   transition.
+3. **Failing Tests:** Added
+   `test_issue53_round3_timing_receipt_reports_state_transition`.
+4. **Implementation:** Added `timing.state_transition` (for example
+   `paused->completed`) and updated API docs/testing guide first.
+5. **Verification:** Full suite green (`138 passed` + web tests passing).
+
+### Round 4 — Artifact path contract in operator docs
+
+1. **Goal Re-Read:** Confirmed issue acceptance requires artifacts/logs to be
+   available for review.
+2. **Pattern Investigation:** Docs had no canonical location for verification
+   artifacts.
+3. **Failing Tests:** Added
+   `test_issue53_round4_api_testing_docs_reference_integration_artifact_path`.
+4. **Implementation:** Added
+   `Integration verification artifacts (Issue #53)` section in
+   `docs/API_TESTING.md` with canonical artifact path.
+5. **Verification:** Full suite green (`139 passed` + web tests passing).
+
+### Round 5 — Committed verification artifact content
+
+1. **Goal Re-Read:** Confirmed artifacts must contain concrete proof, not just
+   a placeholder path.
+2. **Pattern Investigation:** Artifact file did not yet exist.
+3. **Failing Tests:** Added
+   `test_issue53_round5_verification_artifact_contains_timing_and_state_proof`.
+4. **Implementation:** Added
+   `docs/artifacts/issue-53/triage_inbox_verification.md` with captured
+   reset/pause/approve/completed evidence and timing receipt values.
+5. **Verification:** Full suite green (`140 passed` + web tests passing).
+
+### ✅ Final Audit Summary
+
+- **Goal-vs-implementation check:** #53 acceptance criteria met:
+  - end-to-end `triage_inbox` integration verification is explicit and tested
+  - approval update timing is validated against MVP target contract
+  - full backend + web suites pass without regressions
+  - reviewable artifact/log output is committed and linked in docs
+- **Code hygiene:** tightened test assertions to allow additive contract
+  evolution, kept orchestration/timing logic in governance services only,
+  preserved UI separation.
+- **Validation evidence:**
+  - `./.venv/bin/pytest -q` (`140 passed`)
+  - `npm --prefix apps/web test` (`10 passed`)
+
 ## 🗓️ 2026-02-16: Issue #51 — Integration demo backend triage_inbox orchestration + approval pause/resume (5-Round cycle)
 
 ### 🎯 Objective

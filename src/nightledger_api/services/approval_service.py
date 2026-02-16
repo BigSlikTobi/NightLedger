@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta, timezone
+from math import ceil
+from time import perf_counter
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -17,6 +19,7 @@ from nightledger_api.services.run_status_service import project_run_status
 ApprovalDecision = Literal["approved", "rejected"]
 _TRIAGE_INBOX_DEMO_RUN_ID = "run_triage_inbox_demo_1"
 _TRIAGE_INBOX_DEMO_APPROVAL_EVENT_ID = "evt_triage_inbox_003"
+_MVP_APPROVAL_TO_STATE_UPDATE_TARGET_MS = 1000
 
 
 def list_pending_approvals(store: EventStore) -> dict[str, Any]:
@@ -93,10 +96,11 @@ def resolve_pending_approval(
                 store=store,
                 target_event=target_event,
                 run_events=run_events,
+                initial_run_status=projection.status,
                 decision=decision,
                 approver_id=approver_id,
                 reason=reason,
-        )
+            )
         raise NoPendingApprovalError(event_id=event_id)
 
     raise NoPendingApprovalError(event_id=event_id)
@@ -107,10 +111,12 @@ def _append_resolution_event(
     store: EventStore,
     target_event: StoredEvent,
     run_events: list[StoredEvent],
+    initial_run_status: str,
     decision: ApprovalDecision,
     approver_id: str,
     reason: str | None,
 ) -> dict[str, Any]:
+    started_at = perf_counter()
     now = datetime.now(timezone.utc)
     latest_run_timestamp = max(event.timestamp for event in run_events)
     min_resolution_time = latest_run_timestamp + timedelta(milliseconds=1)
@@ -176,7 +182,14 @@ def _append_resolution_event(
                 details=str(exc),
             )
             raise
-    projection = project_run_status(store.list_by_run_id(target_event.run_id))
+    run_events = store.list_by_run_id(target_event.run_id)
+    projection = project_run_status(run_events)
+    approval_to_state_update_ms = _elapsed_ms_ceiling(started_at, perf_counter())
+    orchestration_receipt_gap_ms = _orchestration_receipt_gap_ms(
+        run_events=run_events,
+        resolution_event_id=stored.id,
+        orchestration_event_ids=orchestration_event_ids,
+    )
 
     return {
         "status": "resolved",
@@ -189,6 +202,13 @@ def _append_resolution_event(
         "orchestration": {
             "applied": bool(orchestration_event_ids),
             "event_ids": orchestration_event_ids,
+        },
+        "timing": {
+            "target_ms": _MVP_APPROVAL_TO_STATE_UPDATE_TARGET_MS,
+            "approval_to_state_update_ms": approval_to_state_update_ms,
+            "within_target": approval_to_state_update_ms <= _MVP_APPROVAL_TO_STATE_UPDATE_TARGET_MS,
+            "orchestration_receipt_gap_ms": orchestration_receipt_gap_ms,
+            "state_transition": f"{initial_run_status}->{projection.status}",
         },
     }
 
@@ -314,6 +334,34 @@ def _append_triage_inbox_orchestration_error_event(
     except Exception:
         # Best effort journaling; preserve the original failure as the API error.
         return
+
+
+def _orchestration_receipt_gap_ms(
+    *,
+    run_events: list[StoredEvent],
+    resolution_event_id: str,
+    orchestration_event_ids: list[str],
+) -> int | None:
+    if not orchestration_event_ids:
+        return None
+
+    timestamp_by_event_id = {event.id: event.timestamp for event in run_events}
+    resolution_timestamp = timestamp_by_event_id.get(resolution_event_id)
+    terminal_orchestration_timestamp = timestamp_by_event_id.get(orchestration_event_ids[-1])
+    if resolution_timestamp is None or terminal_orchestration_timestamp is None:
+        return None
+
+    delta_ms = int((terminal_orchestration_timestamp - resolution_timestamp).total_seconds() * 1000)
+    if delta_ms < 0:
+        return None
+    return delta_ms
+
+
+def _elapsed_ms_ceiling(started_at: float, ended_at: float) -> int:
+    elapsed = (ended_at - started_at) * 1000
+    if elapsed <= 0:
+        return 0
+    return ceil(elapsed)
 
 
 def _was_event_resolved(run_events: list[StoredEvent], target_event_id: str) -> bool:

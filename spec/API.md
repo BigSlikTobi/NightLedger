@@ -504,6 +504,13 @@ Response (v0 draft):
   "orchestration": {
     "applied": false,
     "event_ids": []
+  },
+  "timing": {
+    "target_ms": 1000,
+    "approval_to_state_update_ms": 42,
+    "within_target": true,
+    "orchestration_receipt_gap_ms": 2,
+    "state_transition": "paused->completed"
   }
 }
 ```
@@ -541,6 +548,21 @@ Resolution semantics:
   orchestration writes are complete.
 - `orchestration.applied` and `orchestration.event_ids` expose whether
   additional continuation receipts were appended as part of this request.
+- `timing.target_ms` is the MVP responsiveness contract for approval-to-state
+  update at API boundary (`1000ms`).
+- `timing.approval_to_state_update_ms` reports observed end-to-end processing
+  time for resolution write + any continuation receipts + final run-state
+  projection.
+- `timing.approval_to_state_update_ms` is rounded up to the nearest integer
+  millisecond (ceiling) to avoid under-reporting near threshold boundaries.
+- `timing.within_target` confirms whether observed processing stayed within the
+  MVP target and is equivalent to
+  `approval_to_state_update_ms <= target_ms`.
+- `timing.orchestration_receipt_gap_ms` reports deterministic logical timeline
+  distance from `approval_resolved` to terminal orchestration receipt for the
+  canonical `triage_inbox` completion flow (otherwise `null`).
+- `timing.state_transition` reports approval-triggered state change observed by
+  run status projection (for example `paused->completed`).
 - Orchestration failures are fail-loud: they produce structured API errors and
   a journal-visible `error` event (`meta.step: "run_stopped"`) to prevent silent
   state mutation.

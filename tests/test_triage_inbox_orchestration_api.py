@@ -191,3 +191,88 @@ def test_round5_orchestration_applies_only_to_canonical_triage_demo_approval() -
         assert events_response.json()["event_count"] == 2
     finally:
         app.dependency_overrides.clear()
+
+
+def test_issue53_round1_approval_resolution_reports_mvp_timing_receipt() -> None:
+    reset_response = client.post("/v1/demo/triage_inbox/reset-seed")
+    assert reset_response.status_code == 200
+
+    approve_response = client.post(
+        "/v1/approvals/evt_triage_inbox_003",
+        json={
+            "decision": "approved",
+            "approver_id": "human_reviewer",
+            "reason": "Approved for demo completion",
+        },
+    )
+    assert approve_response.status_code == 200
+
+    body = approve_response.json()
+    assert body["timing"]["target_ms"] == 1000
+    assert isinstance(body["timing"]["approval_to_state_update_ms"], int)
+    assert body["timing"]["approval_to_state_update_ms"] >= 0
+    assert isinstance(body["timing"]["within_target"], bool)
+    assert body["timing"]["within_target"] == (
+        body["timing"]["approval_to_state_update_ms"] <= body["timing"]["target_ms"]
+    )
+
+
+def test_issue53_round2_triage_inbox_reports_deterministic_orchestration_gap() -> None:
+    reset_response = client.post("/v1/demo/triage_inbox/reset-seed")
+    assert reset_response.status_code == 200
+
+    approve_response = client.post(
+        "/v1/approvals/evt_triage_inbox_003",
+        json={
+            "decision": "approved",
+            "approver_id": "human_reviewer",
+            "reason": "Approved for demo completion",
+        },
+    )
+    assert approve_response.status_code == 200
+
+    body = approve_response.json()
+    assert body["timing"]["orchestration_receipt_gap_ms"] == 2
+    assert body["timing"]["orchestration_receipt_gap_ms"] <= body["timing"]["target_ms"]
+
+
+def test_issue53_round3_timing_receipt_reports_state_transition() -> None:
+    reset_response = client.post("/v1/demo/triage_inbox/reset-seed")
+    assert reset_response.status_code == 200
+
+    approve_response = client.post(
+        "/v1/approvals/evt_triage_inbox_003",
+        json={
+            "decision": "approved",
+            "approver_id": "human_reviewer",
+            "reason": "Approved for demo completion",
+        },
+    )
+    assert approve_response.status_code == 200
+
+    body = approve_response.json()
+    assert body["timing"]["state_transition"] == "paused->completed"
+
+
+def test_issue53_round6_timing_rounds_up_before_target_comparison(monkeypatch) -> None:
+    from nightledger_api.services import approval_service
+
+    timer_ticks = iter([100.0, 101.0001])
+    monkeypatch.setattr(approval_service, "perf_counter", lambda: next(timer_ticks))
+
+    reset_response = client.post("/v1/demo/triage_inbox/reset-seed")
+    assert reset_response.status_code == 200
+
+    approve_response = client.post(
+        "/v1/approvals/evt_triage_inbox_003",
+        json={
+            "decision": "approved",
+            "approver_id": "human_reviewer",
+            "reason": "Approved for demo completion",
+        },
+    )
+    assert approve_response.status_code == 200
+
+    timing = approve_response.json()["timing"]
+    assert timing["approval_to_state_update_ms"] == 1001
+    assert timing["within_target"] is False
