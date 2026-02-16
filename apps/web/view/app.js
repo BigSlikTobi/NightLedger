@@ -1,47 +1,21 @@
 import { createApp, computed, reactive } from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
 import { MOCK_EVENTS, MOCK_PENDING_APPROVALS } from "../model/mock_data.js";
 import { toTimelineCards } from "../model/timeline_model.js";
+import { createApiClient } from "../controller/api_client.js";
+import { resolveRuntimeConfig } from "../controller/runtime_config.js";
 import { createTimelineController } from "../controller/timeline_controller.js";
-
-function runIdFromLocation() {
-  const url = new URL(window.location.href);
-  return url.searchParams.get("runId") || "demo";
-}
-
-function fetchJournalEvents(runId) {
-  return fetch(`/v1/runs/${encodeURIComponent(runId)}/journal`).then(async (res) => {
-    if (!res.ok) throw new Error(`Request failed (${res.status})`);
-    const body = await res.json();
-    return body.events ?? body.journal ?? [];
-  });
-}
-
-function fetchPendingApprovals() {
-  return fetch("/v1/approvals/pending").then(async (res) => {
-    if (!res.ok) throw new Error(`Request failed (${res.status})`);
-    const body = await res.json();
-    return body.items ?? body.approvals ?? body.pending ?? [];
-  });
-}
-
-function postApprovalDecision(eventId, decision, context = {}) {
-  const approverId = context.approverId || "human_approver";
-  const reason = context.reason;
-
-  return fetch(`/v1/approvals/${encodeURIComponent(eventId)}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ decision, approver_id: approverId, reason }),
-  }).then(async (res) => {
-    if (!res.ok) throw new Error(`Request failed (${res.status})`);
-    return res.json().catch(() => ({}));
-  });
-}
 
 createApp({
   setup() {
+    const runtime = resolveRuntimeConfig(
+      window.location.href,
+      window.__NIGHTLEDGER_API_BASE__ ?? ""
+    );
+    const apiClient = createApiClient({ apiBase: runtime.apiBase });
+
     const state = reactive({
-      runId: runIdFromLocation(),
+      runId: runtime.runId,
+      mode: runtime.mode,
       status: "idle",
       error: "",
       events: [],
@@ -52,7 +26,7 @@ createApp({
     });
 
     const cards = computed(() => toTimelineCards(state.events));
-    const isDemo = computed(() => state.runId === "demo");
+    const isDemo = computed(() => state.mode === "demo");
 
     const controller = createTimelineController({
       runId: state.runId,
@@ -60,13 +34,21 @@ createApp({
         await new Promise((resolve) => setTimeout(resolve, 350));
         return MOCK_EVENTS;
       },
-      getJournalEvents: fetchJournalEvents,
-      listPendingApprovals: fetchPendingApprovals,
+      getJournalEvents: apiClient.getJournalEvents,
+      listPendingApprovals: apiClient.listPendingApprovals,
       getDemoPendingApprovals: async () => {
         await new Promise((resolve) => setTimeout(resolve, 250));
         return MOCK_PENDING_APPROVALS;
       },
-      resolveApproval: postApprovalDecision,
+      resolveApproval: apiClient.resolveApproval,
+      logDecision: (entry) => {
+        const tag = `[nightledger-ui] ${entry.event}`;
+        if (entry.event === "approval_decision_failed") {
+          console.warn(tag, entry);
+          return;
+        }
+        console.info(tag, entry);
+      },
       onState: (next) => {
         state.status = next.status;
         state.error = next.error;

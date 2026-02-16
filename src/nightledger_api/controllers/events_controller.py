@@ -27,6 +27,9 @@ from nightledger_api.services.run_status_service import project_run_status
 router = APIRouter()
 _event_store = InMemoryAppendOnlyEventStore()
 logger = logging.getLogger(__name__)
+uvicorn_logger = logging.getLogger("uvicorn.error")
+logger.setLevel(logging.INFO)
+uvicorn_logger.setLevel(logging.INFO)
 
 
 class ApprovalDecisionRequest(BaseModel):
@@ -159,6 +162,75 @@ def _log_demo_seed_failure(*, exc: Exception, payloads: list[dict[str, Any]]) ->
     )
 
 
+def _log_approval_resolution_requested(
+    *,
+    event_id: str,
+    decision: str,
+    approver_id: str,
+) -> None:
+    _log_structured(
+        logging.INFO,
+        {
+            "event": "approval_resolution_requested",
+            "target_event_id": event_id,
+            "decision": decision,
+            "approver_id": approver_id,
+        },
+    )
+
+
+def _log_approval_resolution_completed(
+    *,
+    event_id: str,
+    decision: str,
+    approver_id: str,
+    result: dict[str, Any],
+) -> None:
+    orchestration = result.get("orchestration", {})
+    timing = result.get("timing", {})
+    _log_structured(
+        logging.INFO,
+        {
+            "event": "approval_resolution_completed",
+            "target_event_id": event_id,
+            "decision": decision,
+            "approver_id": approver_id,
+            "run_id": result.get("run_id"),
+            "run_status": result.get("run_status"),
+            "orchestration_applied": orchestration.get("applied"),
+            "orchestration_event_ids": orchestration.get("event_ids", []),
+            "state_transition": timing.get("state_transition"),
+        },
+    )
+
+
+def _log_approval_resolution_failed(
+    *,
+    event_id: str,
+    decision: str,
+    approver_id: str,
+    exc: Exception,
+) -> None:
+    _log_structured(
+        logging.WARNING,
+        {
+            "event": "approval_resolution_failed",
+            "target_event_id": event_id,
+            "decision": decision,
+            "approver_id": approver_id,
+            "error_type": exc.__class__.__name__,
+            "message": str(exc),
+        },
+        exc_info=True,
+    )
+
+
+def _log_structured(level: int, payload: dict[str, Any], *, exc_info: bool = False) -> None:
+    message = json.dumps(payload)
+    logger.log(level, message, exc_info=exc_info)
+    uvicorn_logger.log(level, message, exc_info=exc_info)
+
+
 @router.post("/v1/events", status_code=status.HTTP_201_CREATED)
 def ingest_event(
     payload: dict[str, Any], store: EventStore = Depends(get_event_store)
@@ -260,14 +332,26 @@ def resolve_approval(
     payload: ApprovalDecisionRequest,
     store: EventStore = Depends(get_event_store),
 ) -> dict[str, Any]:
+    _log_approval_resolution_requested(
+        event_id=event_id,
+        decision=payload.decision,
+        approver_id=payload.approver_id,
+    )
     try:
-        return resolve_pending_approval(
+        result = resolve_pending_approval(
             store=store,
             event_id=event_id,
             decision=payload.decision,
             approver_id=payload.approver_id,
             reason=payload.reason,
         )
+        _log_approval_resolution_completed(
+            event_id=event_id,
+            decision=payload.decision,
+            approver_id=payload.approver_id,
+            result=result,
+        )
+        return result
     except (
         StorageReadError,
         StorageWriteError,
@@ -276,7 +360,13 @@ def resolve_approval(
         NoPendingApprovalError,
         DuplicateApprovalError,
         InconsistentRunStateError,
-    ):
+    ) as exc:
+        _log_approval_resolution_failed(
+            event_id=event_id,
+            decision=payload.decision,
+            approver_id=payload.approver_id,
+            exc=exc,
+        )
         raise
     except Exception as exc:  # pragma: no cover - defensive wrapper
         raise StorageReadError("storage backend read failed") from exc

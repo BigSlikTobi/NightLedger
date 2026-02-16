@@ -5,6 +5,7 @@ export function createTimelineController({
   listPendingApprovals,
   getDemoPendingApprovals,
   resolveApproval,
+  logDecision = () => {},
   onState,
 }) {
   const state = {
@@ -69,12 +70,40 @@ export function createTimelineController({
     state.pendingSubmissionByEventId[eventId] = true;
     state.pendingError = "";
     emit();
+    const approverId = context?.approverId;
+    logDecision({
+      event: "approval_decision_requested",
+      runId,
+      eventId,
+      decision,
+      approverId,
+    });
 
     try {
       await resolveApproval(eventId, decision, context);
-      state.pendingApprovals = state.pendingApprovals.filter((item) => item.event_id !== eventId);
-      emit();
+      logDecision({
+        event: "approval_decision_completed",
+        runId,
+        eventId,
+        decision,
+        approverId,
+      });
+      if (runId === "demo") {
+        state.pendingApprovals = state.pendingApprovals.filter((item) => item.event_id !== eventId);
+        emit();
+      } else {
+        await load();
+        await loadPendingApprovals();
+      }
     } catch (err) {
+      logDecision({
+        event: "approval_decision_failed",
+        runId,
+        eventId,
+        decision,
+        approverId,
+        error: err?.message ?? "Unknown error",
+      });
       state.pendingError = err?.message ?? "Could not resolve approval.";
       emit();
     } finally {

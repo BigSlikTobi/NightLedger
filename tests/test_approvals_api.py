@@ -1,4 +1,5 @@
 from pathlib import Path
+import logging
 import sys
 from typing import Any
 
@@ -446,3 +447,96 @@ def test_post_approval_returns_storage_write_error_on_resolution_append_failure(
     assert response.status_code == 500
     body = response.json()
     assert body["error"]["code"] == "STORAGE_WRITE_ERROR"
+
+
+def test_post_approval_logs_structured_approved_resolution(caplog) -> None:
+    caplog.set_level(logging.INFO, logger="nightledger_api.controllers.events_controller")
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    ingest(
+        build_event_payload(
+            event_id="evt_log_approved",
+            run_id="run_log_approved",
+            timestamp="2026-02-16T17:00:00Z",
+            event_type="approval_requested",
+            requires_approval=True,
+            approval_status="pending",
+            requested_by="agent",
+        )
+    )
+
+    response = client.post(
+        "/v1/approvals/evt_log_approved",
+        json={"decision": "approved", "approver_id": "human_approver"},
+    )
+
+    assert response.status_code == 200
+    assert any(
+        '"event": "approval_resolution_completed"' in record.message
+        and '"decision": "approved"' in record.message
+        and '"approver_id": "human_approver"' in record.message
+        for record in caplog.records
+    )
+
+
+def test_post_approval_logs_structured_rejected_resolution(caplog) -> None:
+    caplog.set_level(logging.INFO, logger="nightledger_api.controllers.events_controller")
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    ingest(
+        build_event_payload(
+            event_id="evt_log_rejected",
+            run_id="run_log_rejected",
+            timestamp="2026-02-16T17:10:00Z",
+            event_type="approval_requested",
+            requires_approval=True,
+            approval_status="pending",
+            requested_by="agent",
+        )
+    )
+
+    response = client.post(
+        "/v1/approvals/evt_log_rejected",
+        json={"decision": "rejected", "approver_id": "human_reviewer"},
+    )
+
+    assert response.status_code == 200
+    assert any(
+        '"event": "approval_resolution_completed"' in record.message
+        and '"decision": "rejected"' in record.message
+        and '"approver_id": "human_reviewer"' in record.message
+        for record in caplog.records
+    )
+
+
+def test_post_approval_logs_structured_completion_to_uvicorn_logger(caplog) -> None:
+    caplog.set_level(logging.INFO, logger="uvicorn.error")
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    ingest(
+        build_event_payload(
+            event_id="evt_log_uvicorn",
+            run_id="run_log_uvicorn",
+            timestamp="2026-02-16T17:20:00Z",
+            event_type="approval_requested",
+            requires_approval=True,
+            approval_status="pending",
+            requested_by="agent",
+        )
+    )
+
+    response = client.post(
+        "/v1/approvals/evt_log_uvicorn",
+        json={"decision": "approved", "approver_id": "human_reviewer"},
+    )
+
+    assert response.status_code == 200
+    assert any(
+        '"event": "approval_resolution_completed"' in record.message
+        and '"decision": "approved"' in record.message
+        and '"approver_id": "human_reviewer"' in record.message
+        for record in caplog.records
+    )
