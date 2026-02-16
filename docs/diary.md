@@ -8,6 +8,105 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-16: Issue #54 — Reproducible demo script and operator handoff (5-Round cycle)
+
+### 🎯 Objective
+
+Finalize the ship-gate handoff by making `docs/DEMO_SCRIPT.md` reproducible for
+another teammate, with explicit outputs, troubleshooting, and evidence mapping.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — Reproducible command path + expected outputs
+
+1. **Goal Re-Read:** Confirmed #54 requires reproducibility from docs only.
+2. **Pattern Investigation:** Existing script was narrative-heavy and lacked one
+   canonical `triage_inbox` command path with concrete expected outputs.
+3. **Failing Tests:** Added
+   `test_issue54_round1_demo_script_defines_reproducible_command_path_with_expected_outputs`.
+4. **Implementation:** Rewrote demo script around canonical flow:
+   seed -> paused -> approve -> completed, with expected outputs per step.
+5. **Verification:** Full suites green after restoring prior journal-doc
+   compatibility expectations.
+
+### Round 2 — Troubleshooting matrix for operator recovery
+
+1. **Goal Re-Read:** Confirmed handoff requires reliable recovery, not only
+   happy path steps.
+2. **Pattern Investigation:** No structured troubleshooting section existed.
+3. **Failing Tests:** Added
+   `test_issue54_round2_demo_script_includes_troubleshooting_matrix`.
+4. **Implementation:** Added `Troubleshooting` with failure signatures and
+   checks for API readiness, `NO_PENDING_APPROVAL`, and `RUN_NOT_FOUND`.
+5. **Verification:** Full suites green.
+
+### Round 3 — Step-to-receipt evidence checklist
+
+1. **Goal Re-Read:** Confirmed issue requires explicit evidence mapping.
+2. **Pattern Investigation:** Script lacked a single checklist mapping steps to
+   journal/event receipts.
+3. **Failing Tests:** Added
+   `test_issue54_round3_demo_script_contains_step_to_receipt_evidence_checklist`.
+4. **Implementation:** Added `Evidence Checklist` table linking each step to
+   auditable receipts (`approval_requested`, `approval_resolved`,
+   `evt_triage_inbox_004`, `evt_triage_inbox_005`).
+5. **Verification:** Full suites green.
+
+### Round 4 — Operator handoff gate criteria
+
+1. **Goal Re-Read:** Confirmed teammate handoff needs clear go/no-go criteria.
+2. **Pattern Investigation:** No operator signoff section existed.
+3. **Failing Tests:** Added
+   `test_issue54_round4_demo_script_contains_operator_handoff_gates`.
+4. **Implementation:** Added `Operator Handoff` section with teammate execution
+   checklist and `Go/No-Go` gates (`run_status`, orchestration, timing target).
+5. **Verification:** Full suites green.
+
+### Round 5 — Diary completion requirement
+
+1. **Goal Re-Read:** Confirmed diary update is mandatory for completed issue
+   work.
+2. **Pattern Investigation:** No `Issue #54` diary entry existed.
+3. **Failing Tests:** Added
+   `test_issue54_round5_diary_records_demo_script_handoff_completion`.
+4. **Implementation:** Added this issue-completion entry with implementation and
+   validation evidence.
+5. **Verification:** Full suites green.
+
+### ✅ Final Audit Summary
+
+- **Goal-vs-implementation check:** #54 acceptance criteria met:
+  - demo is reproducible from docs with canonical command path
+  - expected outputs are explicit at each gate
+  - evidence mapping is complete and step-linked
+  - operator troubleshooting + go/no-go handoff provided
+  - diary entry captured with validation evidence
+- **Validation evidence:**
+  - `./.venv/bin/pytest -q` (`146 passed`)
+  - `npm --prefix apps/web test` (`10 passed`)
+
+## 🗓️ 2026-02-16: Issue #54 follow-up — persistent API command-path hardening
+
+### 🎯 Objective
+
+Close a reproducibility gap found during the parent issue #8 audit where
+`reset_seed_triage_inbox_demo.sh` auto-start mode terminated the API process at
+script exit before subsequent demo curl steps.
+
+### What was changed
+
+- Added a new docs contract test:
+  `test_issue54_round6_demo_script_uses_persistent_api_then_seed_without_auto_start`.
+- Updated `docs/DEMO_SCRIPT.md` command path to:
+  - start API in a persistent terminal (`uvicorn`)
+  - run seeding with `AUTO_START=0` in a second terminal
+- Preserved existing evidence, troubleshooting, and handoff sections.
+
+### Validation
+
+- `./.venv/bin/pytest -q` (`148 passed`)
+- `npm --prefix apps/web test` (`10 passed`)
+
 ## 🗓️ 2026-02-16: Issue #53 follow-up — SOTA hardening pass
 
 ### 🎯 Objective
