@@ -8,6 +8,112 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-16: Issue #59 — Web UI live API mode (base URL + run selection UX) (5-Round cycle)
+
+### 🎯 Objective
+
+Remove local/dev friction for live UI usage by adding explicit runtime mode/API
+base behavior, cross-origin readiness, and operator-ready docs for running UI
+and API on separate ports.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — Runtime mode/base strategy contract
+
+1. **Goal Re-Read:** Confirmed issue requires deterministic live-vs-demo mode
+   handling and API base fallback behavior.
+2. **Pattern Investigation:** `app.js` inferred demo from `runId` only and had
+   no explicit runtime config boundary.
+3. **Failing Tests:** Added
+   `apps/web/controller/runtime_config.test.js` for default demo and non-demo
+   run live fallback behavior.
+4. **Implementation:** Added
+   `apps/web/controller/runtime_config.js` with deterministic resolution.
+5. **Verification:** Full suites green.
+
+### Round 2 — Explicit API client boundary with live base URL support
+
+1. **Goal Re-Read:** Confirmed UI must call live backend reliably across
+   origin/port splits.
+2. **Pattern Investigation:** API calls were scattered in `app.js` with relative
+   paths, causing local cross-port mismatches.
+3. **Failing Tests:** Added
+   `apps/web/controller/api_client.test.js` for URL composition with/without
+   `apiBase`.
+4. **Implementation:** Added `apps/web/controller/api_client.js` and rewired
+   `apps/web/view/app.js` to consume runtime config + API client boundary.
+5. **Verification:** Full suites green.
+
+### Round 3 — Intentional live-mode selection fallback
+
+1. **Goal Re-Read:** Confirmed live mode must be explicit and easy to enter.
+2. **Pattern Investigation:** `mode=live` without `runId` still resolved to
+   `runId=demo`, causing a non-obvious live failure path.
+3. **Failing Tests:** Added runtime-config test for
+   `mode=live` with canonical run fallback.
+4. **Implementation:** Added canonical live run fallback to
+   `run_triage_inbox_demo_1` when live mode is explicit and `runId` is missing.
+5. **Verification:** Full suites green.
+
+### Round 4 — Copy-paste live UI+API operator flow docs
+
+1. **Goal Re-Read:** Confirmed issue acceptance requires explicit local run docs
+   for live UI + API.
+2. **Pattern Investigation:** Web README lacked a concrete two-terminal command
+   path and parameterized URL example.
+3. **Failing Tests:** Added
+   `tests/test_web_live_mode_docs.py::test_issue59_round4_web_readme_includes_copy_paste_live_mode_run_flow`.
+4. **Implementation:** Added `Live Mode (UI + API)` section in
+   `apps/web/README.md` with copy-paste commands and URL parameters.
+5. **Verification:** Full suites green.
+
+### Round 5 — Cross-origin browser readiness (CORS)
+
+1. **Goal Re-Read:** Confirmed acceptance includes separate origin/port support.
+2. **Pattern Investigation:** API preflight returned `405`; UI at `3000` could
+   not reliably call API at `8001` in browser.
+3. **Failing Tests:** Added
+   `tests/test_cors_live_ui.py::test_issue59_round5_cors_preflight_allows_local_web_origin`.
+4. **Implementation:** Added FastAPI `CORSMiddleware` in
+   `src/nightledger_api/main.py` for standard local web origins.
+5. **Verification:** Full suites green.
+
+### ✅ Final Audit Summary
+
+- **Goal-vs-implementation check:** Issue #59 acceptance criteria met:
+  - live UI can target backend across different local origins/ports
+  - approval resolution path refreshes live timeline + pending state
+  - demo mode remains intentionally selectable
+  - docs include copy-paste live UI+API run flow
+  - tests cover runtime mode + API base behavior and CORS readiness
+- **Code hygiene:** Introduced explicit API client/runtime boundaries for UI,
+  preserved representation-only responsibilities in frontend, and kept
+  governance logic in backend services.
+- **Validation evidence:**
+  - `./.venv/bin/pytest -q` (`150 passed`)
+  - `npm --prefix apps/web test` (`16 passed`)
+
+### Follow-up Observability Hardening (Issue #59 continuation)
+
+1. Added explicit UI approval lifecycle console logs in
+   `apps/web/view/app.js` and `apps/web/controller/timeline_controller.js`:
+   - `approval_decision_requested`
+   - `approval_decision_completed`
+   - `approval_decision_failed`
+2. Added structured backend approval resolution logs to both module logger and
+   `uvicorn.error`, including decision and approver metadata:
+   - `approval_resolution_requested`
+   - `approval_resolution_completed`
+   - `approval_resolution_failed`
+3. Expanded tests for frontend and API logging behavior, including a regression
+   check that `uvicorn.error` receives structured completion logs.
+4. Updated docs:
+   - `apps/web/README.md` browser observability notes
+   - `docs/API_TESTING.md` expected structured terminal log markers
+5. Verification:
+   - `./.venv/bin/pytest -q` (`153 passed`)
+   - `npm --prefix apps/web test` (`18 passed`)
+
 ## 🗓️ 2026-02-16: Issue #54 — Reproducible demo script and operator handoff (5-Round cycle)
 
 ### 🎯 Objective

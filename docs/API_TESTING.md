@@ -168,6 +168,13 @@ Expected: `200` with:
 - `run_status` reflects the latest projected status for that run
 - `orchestration` indicates if additional continuation receipts were appended
 
+Expected API terminal logs (`uvicorn`):
+- structured `approval_resolution_requested` line with `target_event_id`,
+  `decision`, and `approver_id`
+- structured `approval_resolution_completed` line with `target_event_id`,
+  `decision`, `approver_id`, and `run_status`
+- for rejected decisions, `run_status` is expected to be `stopped`
+
 ### 4) Verify run status and pending list
 
 ```bash

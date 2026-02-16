@@ -86,7 +86,7 @@ test("loads pending approvals", async () => {
 test("prevents duplicate approval submissions", async () => {
   let calls = 0;
   const controller = createTimelineController({
-    runId: "run-1",
+    runId: "demo",
     getDemoEvents: async () => [],
     getJournalEvents: async () => [],
     listPendingApprovals: async () => [{ event_id: "evt-1", title: "Spend Request" }],
@@ -126,7 +126,7 @@ test("handles stale approval decision safely", async () => {
 test("keeps approval card visible when resolve fails and allows retry", async () => {
   let shouldFail = true;
   const controller = createTimelineController({
-    runId: "run-1",
+    runId: "demo",
     getDemoEvents: async () => [],
     getJournalEvents: async () => [],
     listPendingApprovals: async () => [{ event_id: "evt-1", title: "Spend Request" }],
@@ -148,4 +148,102 @@ test("keeps approval card visible when resolve fails and allows retry", async ()
 
   assert.equal(controller.state.pendingApprovals.length, 0);
   assert.equal(controller.state.pendingError, "");
+});
+
+test("refreshes live timeline and pending approvals after successful approval", async () => {
+  let journalCalls = 0;
+  let pendingCalls = 0;
+
+  const controller = createTimelineController({
+    runId: "run-live",
+    getDemoEvents: async () => [],
+    getJournalEvents: async () => {
+      journalCalls += 1;
+      return journalCalls === 1 ? [{ title: "before" }] : [{ title: "after" }];
+    },
+    listPendingApprovals: async () => {
+      pendingCalls += 1;
+      return pendingCalls === 1 ? [{ event_id: "evt-1", title: "Approval" }] : [];
+    },
+    resolveApproval: async () => ({ ok: true }),
+    onState: () => {},
+  });
+
+  await controller.load();
+  await controller.loadPendingApprovals();
+  await controller.submitApprovalDecision("evt-1", "approved", { approverId: "human_approver" });
+
+  assert.equal(journalCalls, 2);
+  assert.equal(pendingCalls, 2);
+  assert.equal(controller.state.events[0].title, "after");
+  assert.equal(controller.state.pendingApprovals.length, 0);
+});
+
+test("emits decision logs for approval lifecycle", async () => {
+  const logs = [];
+  const controller = createTimelineController({
+    runId: "run-live",
+    getDemoEvents: async () => [],
+    getJournalEvents: async () => [],
+    listPendingApprovals: async () => [{ event_id: "evt-42", title: "Approval" }],
+    resolveApproval: async () => ({ ok: true }),
+    logDecision: (entry) => logs.push(entry),
+    onState: () => {},
+  });
+
+  await controller.loadPendingApprovals();
+  await controller.submitApprovalDecision("evt-42", "rejected", { approverId: "human_reviewer" });
+
+  assert.deepEqual(logs, [
+    {
+      event: "approval_decision_requested",
+      runId: "run-live",
+      eventId: "evt-42",
+      decision: "rejected",
+      approverId: "human_reviewer",
+    },
+    {
+      event: "approval_decision_completed",
+      runId: "run-live",
+      eventId: "evt-42",
+      decision: "rejected",
+      approverId: "human_reviewer",
+    },
+  ]);
+});
+
+test("emits failure decision log when approval request fails", async () => {
+  const logs = [];
+  const controller = createTimelineController({
+    runId: "run-live",
+    getDemoEvents: async () => [],
+    getJournalEvents: async () => [],
+    listPendingApprovals: async () => [{ event_id: "evt-500", title: "Approval" }],
+    resolveApproval: async () => {
+      throw new Error("Request failed (500)");
+    },
+    logDecision: (entry) => logs.push(entry),
+    onState: () => {},
+  });
+
+  await controller.loadPendingApprovals();
+  await controller.submitApprovalDecision("evt-500", "approved", { approverId: "human_reviewer" });
+
+  assert.deepEqual(logs, [
+    {
+      event: "approval_decision_requested",
+      runId: "run-live",
+      eventId: "evt-500",
+      decision: "approved",
+      approverId: "human_reviewer",
+    },
+    {
+      event: "approval_decision_failed",
+      runId: "run-live",
+      eventId: "evt-500",
+      decision: "approved",
+      approverId: "human_reviewer",
+      error: "Request failed (500)",
+    },
+  ]);
 });
