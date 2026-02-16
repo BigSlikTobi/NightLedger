@@ -8,6 +8,85 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-16: Issue #51 — Integration demo backend triage_inbox orchestration + approval pause/resume (5-Round cycle)
+
+### 🎯 Objective
+
+Wire backend orchestration for the deterministic `triage_inbox` demo so risky
+steps pause, approvals resume safely to completion, transitions are explicitly
+queryable, and failure paths are fail-loud with receipts.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — Approved triage gate reaches terminal completion
+
+1. **Goal Re-Read:** Confirmed #51 requires pause on risky step and resume to terminal completion.
+2. **Pattern Investigation:** Existing flow stopped at `approved`; no completion orchestration existed.
+3. **Failing Tests:** Added `test_round1_triage_inbox_approval_resume_reaches_terminal_completed_state`.
+4. **Implementation:** Extended approval service to append deterministic
+   post-approval `action` (`evt_triage_inbox_004`) and terminal `summary`
+   (`evt_triage_inbox_005`) for seeded demo flow.
+5. **Verification:** Full suite green (`132 passed`).
+
+### Round 2 — Response-level transition queryability
+
+1. **Goal Re-Read:** Confirmed transition state must be explicit and queryable.
+2. **Pattern Investigation:** Approval API response lacked resulting run state
+   and orchestration receipt metadata.
+3. **Failing Tests:** Added `test_round2_triage_inbox_approval_response_surfaces_transition_receipts`.
+4. **Implementation:** Added `run_status` and `orchestration` block to
+   approval-resolution response.
+5. **Verification:** Full suite green (`133 passed`).
+
+### Round 3 — Fail-loud + journaled orchestration failure path
+
+1. **Goal Re-Read:** Confirmed no-silent-failure requirement and auditable error paths.
+2. **Pattern Investigation:** Orchestration append failure returned `500` but
+   left no explicit error receipt in run journal.
+3. **Failing Tests:** Added
+   `test_round3_orchestration_append_failure_is_structured_and_journaled`.
+4. **Implementation:** On orchestration append failure, service now best-effort
+   appends a terminal `error` event (`meta.step: run_stopped`) and re-raises
+   `StorageWriteError`.
+5. **Verification:** Full suite green (`134 passed`).
+
+### Round 4 — Explicit storage error detail contract
+
+1. **Goal Re-Read:** Confirmed error path should be structured and explicit.
+2. **Pattern Investigation:** Storage error message was generic
+   (`storage backend append failed`).
+3. **Failing Tests:** Tightened Round 3 test to assert explicit orchestration
+   failure detail message.
+4. **Implementation:** Raised
+   `StorageWriteError("triage_inbox orchestration append failed")` for
+   continuation write failures.
+5. **Verification:** Full suite green (`134 passed`).
+
+### Round 5 — Canonical target guard for orchestration scope
+
+1. **Goal Re-Read:** Confirmed orchestration should be deterministic and avoid
+   side effects outside intended demo gate.
+2. **Pattern Investigation:** Orchestration was keyed only by run ID, so any
+   approved pending event in the demo run triggered completion writes.
+3. **Failing Tests:** Added
+   `test_round5_orchestration_applies_only_to_canonical_triage_demo_approval`.
+4. **Implementation:** Scoped orchestration to canonical seeded target
+   `evt_triage_inbox_003` in `run_triage_inbox_demo_1`.
+5. **Verification:** Full suite green (`135 passed`).
+
+### ✅ Final Audit Summary
+
+- **Goal-vs-implementation check:** #51 acceptance criteria met:
+  - risky gate pauses (`paused` before approval)
+  - approval resumes to terminal completion for canonical demo flow
+  - transitions are explicit/queryable (`run_status`, `orchestration`,
+    journal/event receipts)
+  - failure paths are structured and fail-loud with journaled error receipts
+- **Code hygiene:** Added focused tests and isolated service-layer changes only;
+  no UI/governance boundary violations.
+- **Validation evidence:**
+  - `./.venv/bin/pytest -q` (final: `135 passed`)
+
 ## 🗓️ 2026-02-16: Approval stale-target duplicate fix follow-up
 
 ### 🎯 Objective

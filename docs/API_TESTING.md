@@ -51,6 +51,56 @@ containing `demo_seed_failed`.
 
 Unexpected storage append failures surface as `STORAGE_WRITE_ERROR`.
 
+## triage_inbox Orchestration Smoke Flow (Issue #51)
+
+### 1) Seed deterministic paused demo run
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/demo/triage_inbox/reset-seed
+```
+
+Expected:
+- `200` with `run_id: "run_triage_inbox_demo_1"`
+- `/v1/runs/run_triage_inbox_demo_1/status` reports `paused`
+
+### 2) Approve the seeded risky step
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/approvals/evt_triage_inbox_003 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "decision":"approved",
+    "approver_id":"human_reviewer",
+    "reason":"Approved for demo completion"
+  }'
+```
+
+Expected:
+- `200` with `status: "resolved"`
+- backend appends explicit resume receipts for `triage_inbox`
+- response includes `run_status: "completed"`
+- response includes `orchestration.applied: true` with
+  `event_ids: ["evt_triage_inbox_004", "evt_triage_inbox_005"]`
+- orchestration applies only when resolving the canonical seeded demo target
+  `evt_triage_inbox_003`; other approvals stay non-orchestrated
+- if orchestration appends fail, expect `500 STORAGE_WRITE_ERROR` and a
+  journal-visible `error` event that stops the run (`meta.step: run_stopped`)
+- failure detail message should be:
+  `triage_inbox orchestration append failed`
+
+### 3) Verify terminal completion and receipts
+
+```bash
+curl -sS http://127.0.0.1:8001/v1/runs/run_triage_inbox_demo_1/status
+curl -sS http://127.0.0.1:8001/v1/runs/run_triage_inbox_demo_1/journal
+```
+
+Expected:
+- status endpoint reports `completed`
+- journal includes `approval_resolved`, a resumed `action`, and terminal
+  `summary` entries in deterministic order
+- no silent state mutation: all lifecycle transitions are visible as events
+
 ## Approval Endpoint Smoke Flow (Issue #4)
 
 ### 1) Create a pending approval event
@@ -106,6 +156,8 @@ Expected: `200` with:
 - `status: "resolved"`
 - `target_event_id: "evt_approval_demo_1"`
 - `decision: "approved"`
+- `run_status` reflects the latest projected status for that run
+- `orchestration` indicates if additional continuation receipts were appended
 
 ### 4) Verify run status and pending list
 
