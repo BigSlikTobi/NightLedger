@@ -81,6 +81,15 @@ Expected:
 - response includes `run_status: "completed"`
 - response includes `orchestration.applied: true` with
   `event_ids: ["evt_triage_inbox_004", "evt_triage_inbox_005"]`
+- response includes `timing.target_ms: 1000`
+- response includes `timing.approval_to_state_update_ms` and
+  `timing.within_target: true`
+- response should satisfy
+  `timing.within_target == (timing.approval_to_state_update_ms <= timing.target_ms)`
+- response includes deterministic
+  `timing.orchestration_receipt_gap_ms: 2` for canonical `triage_inbox`
+  completion
+- response includes `timing.state_transition: "paused->completed"`
 - orchestration applies only when resolving the canonical seeded demo target
   `evt_triage_inbox_003`; other approvals stay non-orchestrated
 - if orchestration appends fail, expect `500 STORAGE_WRITE_ERROR` and a
@@ -238,6 +247,19 @@ Expected:
 Other documented failure classes:
 - `409 INCONSISTENT_RUN_STATE` when stored run events are inconsistent or malformed.
 - `500 STORAGE_READ_ERROR` when the backing store fails on read.
+
+## Integration verification artifacts (Issue #53)
+
+Reviewable verification output is stored at:
+
+- `docs/artifacts/issue-53/triage_inbox_verification.md`
+
+This artifact captures end-to-end `triage_inbox` proof points:
+
+- pause state before approval
+- approval response timing receipt (`target_ms`, observed ms, within-target flag)
+- deterministic orchestration gap and transition state
+- terminal completion status after approval
 
 ## Full Regression Suite
 
