@@ -15,7 +15,13 @@ Demonstrate that NightLedger provides autonomy with receipts:
 PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --reload --port 8001
 ```
 
-2. Open web app and select a run ID for demo narration.
+2. Seed deterministic `triage_inbox` demo state:
+
+```bash
+bash tasks/reset_seed_triage_inbox_demo.sh
+```
+
+3. Open web app and select a run ID for demo narration.
 
 ## Live Flow
 

@@ -8,6 +8,116 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-16: Approval stale-target duplicate fix follow-up
+
+### 🎯 Objective
+
+Fix failing approval API behavior where resolving a previously resolved target
+after a new pending event in the same run returned `INCONSISTENT_RUN_STATE`
+instead of `DUPLICATE_APPROVAL`.
+
+### What was changed
+
+- Updated duplicate-resolution detection in
+   `src/nightledger_api/services/approval_service.py` to reliably identify prior
+   resolution by matching generated resolution event IDs using the
+   `apr_<target_event_id>_...` prefix.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_approvals_api.py::test_post_approval_returns_duplicate_for_stale_resolved_target_with_new_pending`
+- `./.venv/bin/pytest -q`
+
+### Result
+
+- Stale resolved targets now consistently return `DUPLICATE_APPROVAL`.
+- Full suite is green (`131 passed`).
+
+## 🗓️ 2026-02-16: Issue #50 — Deterministic triage_inbox fixture + reset path (5-Round restart)
+
+### 🎯 Objective
+
+Deliver a deterministic `triage_inbox` reset/seed path with a one-command setup
+flow, schema-validated seed data, and fail-loud setup behavior.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — Deterministic reset/seed API contract
+
+1. **Goal Re-Read:** Confirmed issue #50 requires deterministic seed + reset baseline.
+2. **Pattern Investigation:** Found no dedicated `reset-seed` endpoint.
+3. **Failing Tests:** Added
+   `test_round1_demo_reset_seed_returns_deterministic_manifest` and confirmed
+   red (`404`).
+4. **Implementation:** Added `POST /v1/demo/triage_inbox/reset-seed` with fixed
+   payload fixture and deterministic manifest response.
+5. **Verification:** Round test green; full suite run executed (single unrelated
+   pre-existing approvals failure remained).
+
+### Round 2 — One-command setup path
+
+1. **Goal Re-Read:** Confirmed issue requires one command for local setup.
+2. **Pattern Investigation:** No script existed under `tasks/`.
+3. **Failing Tests:** Added
+   `test_round2_single_command_setup_script_exists_and_is_executable` and
+   confirmed red.
+4. **Implementation:** Added executable
+   `tasks/reset_seed_triage_inbox_demo.sh` with optional API auto-start and
+   seed endpoint call.
+5. **Verification:** Round test green; full suite run executed (same unrelated
+   approvals failure).
+
+### Round 3 — Structured setup failure logging
+
+1. **Goal Re-Read:** Confirmed no-silent-failure requirement from constitution.
+2. **Pattern Investigation:** Seed path had no structured failure logs.
+3. **Failing Tests:** Added
+   `test_round3_logs_structured_setup_failure` and confirmed red.
+4. **Implementation:** Added structured `demo_seed_failed` logging with event
+   IDs, error class, and message.
+5. **Verification:** Round test green; full suite run executed (same unrelated
+   approvals failure).
+
+### Round 4 — Structured error envelope for unexpected append failures
+
+1. **Goal Re-Read:** Confirmed setup failures must remain structured and visible.
+2. **Pattern Investigation:** Unexpected append exceptions surfaced as raw
+   runtime failures.
+3. **Failing Tests:** Added
+   `test_round4_unexpected_seed_append_failure_returns_structured_storage_error`
+   and confirmed red.
+4. **Implementation:** Wrapped unexpected seed failures into
+   `StorageWriteError("demo reset-seed failed")` while preserving schema and
+   duplicate error semantics.
+5. **Verification:** Round tests green; full suite run executed (same unrelated
+   approvals failure).
+
+### Round 5 — API runbook enforces single-command setup
+
+1. **Goal Re-Read:** Confirmed reproducibility requirement for another teammate.
+2. **Pattern Investigation:** `docs/API_TESTING.md` still used raw curl path.
+3. **Failing Tests:** Added
+   `test_round5_api_testing_docs_include_single_command_demo_setup` and
+   confirmed red.
+4. **Implementation:** Updated docs to standardize on
+   `bash tasks/reset_seed_triage_inbox_demo.sh`.
+5. **Verification:** Round docs test green; full suite run executed (same
+   unrelated approvals failure).
+
+### ✅ Final Audit Summary
+
+- **Goal-vs-implementation check:**
+  - deterministic reset/seed API endpoint delivered
+  - one-command setup path delivered
+  - schema validation enforced during seed
+  - setup failure logging and structured error envelope behavior delivered
+- **Code hygiene:** no additional unrelated refactors introduced.
+- **Verification evidence:**
+  - `./.venv/bin/pytest -q tests/test_demo_setup_api.py`
+  - `./.venv/bin/pytest -q tests/test_demo_setup_docs.py`
+  - `./.venv/bin/pytest -q` (single pre-existing unrelated approval test failure persists)
+
+
 ## 🗓️ 2026-02-15: Issue #34 — Journal API Integration Coverage (5-Round Big Slik Cycle)
 
 ### 🎯 Objective
