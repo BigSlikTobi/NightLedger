@@ -38,6 +38,19 @@ Or against an already running API:
 AUTO_START=0 BASE_URL=http://127.0.0.1:8001 bash tasks/smoke_status_curl.sh
 ```
 
+## Deterministic triage_inbox setup
+
+Reset and seed deterministic demo data:
+
+```bash
+bash tasks/reset_seed_triage_inbox_demo.sh
+```
+
+On setup failure, expect a structured error response and a structured log entry
+containing `demo_seed_failed`.
+
+Unexpected storage append failures surface as `STORAGE_WRITE_ERROR`.
+
 ## Approval Endpoint Smoke Flow (Issue #4)
 
 ### 1) Create a pending approval event
