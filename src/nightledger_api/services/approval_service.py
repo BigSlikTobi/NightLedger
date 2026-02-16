@@ -15,6 +15,8 @@ from nightledger_api.services.event_store import EventStore, StoredEvent
 from nightledger_api.services.run_status_service import project_run_status
 
 ApprovalDecision = Literal["approved", "rejected"]
+_TRIAGE_INBOX_DEMO_RUN_ID = "run_triage_inbox_demo_1"
+_TRIAGE_INBOX_DEMO_APPROVAL_EVENT_ID = "evt_triage_inbox_003"
 
 
 def list_pending_approvals(store: EventStore) -> dict[str, Any]:
@@ -153,6 +155,29 @@ def _append_resolution_event(
     except Exception as exc:  # pragma: no cover - defensive wrapper
         raise StorageWriteError("storage backend append failed") from exc
 
+    orchestration_event_ids: list[str] = []
+    if (
+        decision == "approved"
+        and target_event.run_id == _TRIAGE_INBOX_DEMO_RUN_ID
+        and target_event.id == _TRIAGE_INBOX_DEMO_APPROVAL_EVENT_ID
+    ):
+        try:
+            orchestration_event_ids = _append_triage_inbox_completion_events(
+                store=store,
+                run_id=target_event.run_id,
+                resolved_at=stored.timestamp,
+                confidence=target_event.payload.get("confidence"),
+            )
+        except StorageWriteError as exc:
+            _append_triage_inbox_orchestration_error_event(
+                store=store,
+                run_id=target_event.run_id,
+                resolved_at=stored.timestamp,
+                details=str(exc),
+            )
+            raise
+    projection = project_run_status(store.list_by_run_id(target_event.run_id))
+
     return {
         "status": "resolved",
         "event_id": stored.id,
@@ -160,7 +185,135 @@ def _append_resolution_event(
         "run_id": target_event.run_id,
         "decision": decision,
         "resolved_at": resolved_at,
+        "run_status": projection.status,
+        "orchestration": {
+            "applied": bool(orchestration_event_ids),
+            "event_ids": orchestration_event_ids,
+        },
     }
+
+
+def _append_triage_inbox_completion_events(
+    *,
+    store: EventStore,
+    run_id: str,
+    resolved_at: datetime,
+    confidence: Any,
+) -> list[str]:
+    resume_at = _format_timestamp(resolved_at + timedelta(milliseconds=1))
+    complete_at = _format_timestamp(resolved_at + timedelta(milliseconds=2))
+
+    resume_payload = validate_event_payload(
+        {
+            "id": "evt_triage_inbox_004",
+            "run_id": run_id,
+            "timestamp": resume_at,
+            "type": "action",
+            "actor": "agent",
+            "title": "Resume triage_inbox after approval",
+            "details": "Human approval received; sending final customer response.",
+            "confidence": confidence,
+            "risk_level": "medium",
+            "requires_approval": False,
+            "approval": {
+                "status": "not_required",
+                "requested_by": None,
+                "resolved_by": None,
+                "resolved_at": None,
+                "reason": None,
+            },
+            "evidence": [
+                {
+                    "kind": "log",
+                    "label": "Post-approval execution log",
+                    "ref": "log://triage-inbox/004",
+                }
+            ],
+            "meta": {"workflow": "triage_inbox", "step": "resume_after_approval"},
+        }
+    )
+    complete_payload = validate_event_payload(
+        {
+            "id": "evt_triage_inbox_005",
+            "run_id": run_id,
+            "timestamp": complete_at,
+            "type": "summary",
+            "actor": "agent",
+            "title": "triage_inbox run completed",
+            "details": "Workflow completed after human approval.",
+            "confidence": confidence,
+            "risk_level": "low",
+            "requires_approval": False,
+            "approval": {
+                "status": "not_required",
+                "requested_by": None,
+                "resolved_by": None,
+                "resolved_at": None,
+                "reason": None,
+            },
+            "evidence": [
+                {
+                    "kind": "artifact",
+                    "label": "Final response receipt",
+                    "ref": "artifact://triage-inbox/005",
+                }
+            ],
+            "meta": {"workflow": "triage_inbox", "step": "run_completed"},
+        }
+    )
+
+    try:
+        store.append(resume_payload)
+        store.append(complete_payload)
+    except StorageWriteError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise StorageWriteError("triage_inbox orchestration append failed") from exc
+    return [resume_payload.id, complete_payload.id]
+
+
+def _append_triage_inbox_orchestration_error_event(
+    *,
+    store: EventStore,
+    run_id: str,
+    resolved_at: datetime,
+    details: str,
+) -> None:
+    error_at = _format_timestamp(resolved_at + timedelta(milliseconds=3))
+    error_event = validate_event_payload(
+        {
+            "id": f"evt_triage_inbox_err_{uuid4().hex[:10]}",
+            "run_id": run_id,
+            "timestamp": error_at,
+            "type": "error",
+            "actor": "system",
+            "title": "triage_inbox orchestration failed",
+            "details": f"Post-approval continuation failed: {details}",
+            "confidence": None,
+            "risk_level": "high",
+            "requires_approval": False,
+            "approval": {
+                "status": "not_required",
+                "requested_by": None,
+                "resolved_by": None,
+                "resolved_at": None,
+                "reason": None,
+            },
+            "evidence": [
+                {
+                    "kind": "log",
+                    "label": "Orchestration failure log",
+                    "ref": "log://triage-inbox/orchestration-error",
+                }
+            ],
+            "meta": {"workflow": "triage_inbox", "step": "run_stopped"},
+        }
+    )
+    try:
+        store.append(error_event)
+    except Exception:
+        # Best effort journaling; preserve the original failure as the API error.
+        return
 
 
 def _was_event_resolved(run_events: list[StoredEvent], target_event_id: str) -> bool:
