@@ -75,13 +75,14 @@ def resolve_pending_approval(
 
     target_event = matches[0]
     run_events = store.list_by_run_id(target_event.run_id)
-    projection = project_run_status(run_events)
 
     if not _is_pending_signal(target_event):
         raise NoPendingApprovalError(event_id=event_id)
 
     if _was_event_resolved(run_events, event_id):
         raise DuplicateApprovalError(event_id=event_id)
+
+    projection = project_run_status(run_events)
 
     pending_context = projection.pending_approval
     if projection.status == "paused" and pending_context is not None:
@@ -164,12 +165,15 @@ def _append_resolution_event(
 
 def _was_event_resolved(run_events: list[StoredEvent], target_event_id: str) -> bool:
     current_pending_event_id: str | None = None
+    resolution_prefix = f"apr_{target_event_id}_"
 
     for event in run_events:
         if _is_pending_signal(event):
             current_pending_event_id = event.id
             continue
         if _is_resolution_signal(event):
+            if event.id.startswith(resolution_prefix):
+                return True
             if current_pending_event_id == target_event_id:
                 return True
             current_pending_event_id = None
