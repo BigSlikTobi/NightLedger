@@ -499,7 +499,12 @@ Response (v0 draft):
   "target_event_id": "evt_123",
   "run_id": "run_123",
   "decision": "approved",
-  "resolved_at": "2026-02-15T13:01:00Z"
+  "resolved_at": "2026-02-15T13:01:00Z",
+  "run_status": "approved|stopped|completed",
+  "orchestration": {
+    "applied": false,
+    "event_ids": []
+  }
 }
 ```
 
@@ -512,6 +517,11 @@ Error responses (v0 draft):
 - Storage append failure while writing approval resolution: `500` / `STORAGE_WRITE_ERROR`
 - Stale resolution attempts for previously resolved targets return
   `DUPLICATE_APPROVAL` even if a different approval is currently pending.
+- If post-approval orchestration appends fail after resolution write, return
+  `500 STORAGE_WRITE_ERROR` and append a dedicated `error` receipt to the run
+  journal (where storage permits) with terminal stop semantics.
+  The storage detail message is
+  `"triage_inbox orchestration append failed"`.
 
 Resolution semantics:
 
@@ -519,6 +529,21 @@ Resolution semantics:
 - Legal transition is `pending -> approved|rejected`.
 - `approver_id` and `resolved_at` must be present on resolved events.
 - `decision="rejected"` writes terminal approval metadata for stop semantics.
+- For the deterministic `triage_inbox` demo run (`run_triage_inbox_demo_1`),
+  `decision="approved"` triggers orchestration resume events immediately after
+  approval resolution only for the canonical seeded gate event
+  (`target_event_id: "evt_triage_inbox_003"`):
+  - a post-approval `action` event for resumed execution
+  - a terminal `summary` event for completed workflow state
+  This keeps the pause/resume transition explicit and auditable in append-only
+  receipts.
+- `run_status` reports the latest projected status after all resolution-side
+  orchestration writes are complete.
+- `orchestration.applied` and `orchestration.event_ids` expose whether
+  additional continuation receipts were appended as part of this request.
+- Orchestration failures are fail-loud: they produce structured API errors and
+  a journal-visible `error` event (`meta.step: "run_stopped"`) to prevent silent
+  state mutation.
 
 Ambiguous event ID error response (v0 draft):
 
