@@ -1381,3 +1381,83 @@ append-only events, with clear structured errors for inconsistent run state.
   "time-travel" bugs in the ledger.
 - **Fail Loudly:** Chose `422 Unprocessable Content` with specific codes (e.g.,
   `MISSING_RUN_ID`) over generic 400s to help agent developers debug faster.
+
+---
+
+## 🗓️ 2026-02-17: Issue #66 — Repo Hygiene Policy + Audit
+
+### 🎯 Objective
+
+Document and validate a repeatable repo hygiene policy covering stale branch
+cleanup, generated artifact history handling, and `.gitignore` alignment.
+
+### Round 1 — Branch inventory + cleanup execution decision
+
+1. **Goal Re-Read:** Confirmed issue scope requires a stale-branch cleanup plan
+   and an execution/defer decision.
+2. **Pattern Investigation:** Audited remote branch merge state and divergence
+   against `origin/main`.
+3. **Failing Tests:** Added
+   `test_issue66_round1_branch_inventory_and_cleanup_decision_are_documented`.
+4. **Implementation:** Added `docs/REPO_HYGIENE.md` with a
+   `2026-02-17` branch snapshot, candidate deletion list, safety checks, and
+   explicit deferred execution status.
+5. **Verification:** Ran targeted issue-66 tests.
+
+### Round 2 — Retention rules hardening
+
+1. **Goal Re-Read:** Confirmed policy requirements include naming and retention
+   expectations.
+2. **Pattern Investigation:** Compared existing branch naming conventions
+   (`Coder/`, `feat/`, `fix/`, `chore/`, `docs/`) and merge lifecycle.
+3. **Failing Tests:** Added
+   `test_issue66_round2_retention_policy_has_naming_age_and_safety_rules`.
+4. **Implementation:** Documented explicit rules: merged-branch deletion within
+   7 days, never delete protected branches, and require ahead/behind checks.
+5. **Verification:** Re-ran targeted issue-66 tests.
+
+### Round 3 — Generated artifact history decision
+
+1. **Goal Re-Read:** Confirmed issue requires an explicit strategy for
+   generated artifacts in historical commits.
+2. **Pattern Investigation:** Verified historical `.pyc/__pycache__` traces and
+   checked that HEAD has no tracked generated artifacts.
+3. **Failing Tests:** Added
+   `test_issue66_round3_generated_artifact_history_strategy_is_explicit`.
+4. **Implementation:** Recorded decision to keep history as-is (no rewrite),
+   with rewrite reserved for legal/security redaction cases.
+5. **Verification:** Re-ran targeted issue-66 tests.
+
+### Round 4 — .gitignore alignment verification
+
+1. **Goal Re-Read:** Confirmed acceptance requires `.gitignore` coverage
+   alignment with generated artifacts.
+2. **Pattern Investigation:** Audited current ignore entries for Python cache
+   and pytest cache artifacts.
+3. **Failing Tests:** Added
+   `test_issue66_round4_gitignore_covers_daily_generated_python_artifacts`.
+4. **Implementation:** Kept existing ignore patterns and documented them in
+   `docs/REPO_HYGIENE.md` as the operational baseline.
+5. **Verification:** Re-ran targeted issue-66 tests.
+
+### Round 5 — Closure tracking + discoverability
+
+1. **Goal Re-Read:** Confirmed issue asks for closure linkage and reviewable
+   outcomes.
+2. **Pattern Investigation:** Checked where policy docs are surfaced from
+   canonical entry points.
+3. **Failing Tests:** Added
+   `test_issue66_round5_closure_tracking_and_diary_entry_exist`.
+4. **Implementation:** Linked `docs/REPO_HYGIENE.md` from `README.md` and
+   recorded closure track linkage to cleanup umbrella `#62`.
+5. **Verification:** Ran issue-66 targeted tests and then full suite.
+
+### ✅ Final Audit Summary
+
+- Added `docs/REPO_HYGIENE.md` with branch inventory, stale branch cleanup
+  safety checks, and explicit deferred execution.
+- Documented branch retention policy and generated artifact history decision.
+- Confirmed `.gitignore` coverage for Python generated artifacts remains
+  aligned.
+- Added `tests/test_issue66_repo_hygiene_docs.py` to keep this policy
+  test-enforced.
