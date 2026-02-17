@@ -32,8 +32,12 @@ from nightledger_api.services.errors import (
 )
 
 
+HTTP_422_UNPROCESSABLE = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", None)
+if HTTP_422_UNPROCESSABLE is None:
+    HTTP_422_UNPROCESSABLE = status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
 app = FastAPI(title="NightLedger API", version="0.1.0")
-SCHEMA_VALIDATION_STATUS_CODE = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", 422)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -55,7 +59,7 @@ async def handle_request_validation_error(
 ) -> JSONResponse:
     if request.method == "POST" and request.url.path.startswith("/v1/approvals/"):
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=HTTP_422_UNPROCESSABLE,
             content=present_approval_request_validation_error(exc),
         )
     return await request_validation_exception_handler(request, exc)
@@ -67,7 +71,7 @@ async def handle_schema_validation_error(
 ) -> JSONResponse:
     _ = request
     return JSONResponse(
-        status_code=SCHEMA_VALIDATION_STATUS_CODE,
+        status_code=HTTP_422_UNPROCESSABLE,
         content=present_schema_validation_error(exc),
     )
 
