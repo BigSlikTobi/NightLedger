@@ -35,6 +35,7 @@ from nightledger_api.services.errors import (
 HTTP_422_UNPROCESSABLE = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", None)
 if HTTP_422_UNPROCESSABLE is None:
     HTTP_422_UNPROCESSABLE = status.HTTP_422_UNPROCESSABLE_ENTITY
+SCHEMA_VALIDATION_STATUS_CODE = HTTP_422_UNPROCESSABLE
 
 
 app = FastAPI(title="NightLedger API", version="0.1.0")
