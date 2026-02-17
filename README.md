@@ -25,7 +25,25 @@ Use one primary document per concern to avoid contract drift:
 | `docs/API_TESTING.md` | Local API smoke flows |
 | `docs/DEMO_SCRIPT.md` | Reproducible demo handoff path |
 
-## Quick Start (Local)
+## Quick Start (Fresh Clone)
+
+```bash
+git clone https://github.com/bigsliktobi/NightLedger.git
+cd NightLedger
+python -m venv .venv
+./.venv/bin/pip install --upgrade pip
+./.venv/bin/pip install -r requirements.txt
+```
+
+## Local Verification (Matches CI)
+
+```bash
+./.venv/bin/pytest -q
+cd apps/web
+node --test model/*.test.js controller/*.test.js
+```
+
+## Quick Start (Local Runtime)
 
 ### 1) Start API (Terminal A)
 
@@ -43,13 +61,6 @@ Open:
 
 ```text
 http://localhost:3000/view/?mode=live&runId=run_triage_inbox_demo_1&apiBase=http://127.0.0.1:8001
-```
-
-### 3) Run tests
-
-```bash
-./.venv/bin/pytest -q
-npm --prefix apps/web test
 ```
 
 ## Local Demo Data Reset

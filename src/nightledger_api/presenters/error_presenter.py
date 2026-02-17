@@ -1,5 +1,7 @@
 from typing import Any
 
+from fastapi.exceptions import RequestValidationError
+
 from nightledger_api.services.errors import (
     AmbiguousEventIdError,
     ApprovalNotFoundError,
@@ -183,3 +185,51 @@ def present_duplicate_approval_error(exc: DuplicateApprovalError) -> dict[str, A
             ],
         }
     }
+
+
+def present_approval_request_validation_error(
+    exc: RequestValidationError,
+) -> dict[str, Any]:
+    details: list[dict[str, str]] = []
+
+    for error in exc.errors():
+        loc = error.get("loc", ())
+        if len(loc) < 2 or loc[0] != "body":
+            continue
+
+        path = ".".join(str(part) for part in loc[1:])
+        details.append(
+            {
+                "path": path,
+                "message": str(error.get("msg", "Invalid input")),
+                "type": str(error.get("type", "validation_error")),
+                "code": _map_approval_validation_code(
+                    path=path,
+                    error_type=str(error.get("type", "validation_error")),
+                ),
+            }
+        )
+
+    details.sort(key=lambda detail: (detail["path"], detail["code"], detail["type"]))
+
+    return {
+        "error": {
+            "code": "REQUEST_VALIDATION_ERROR",
+            "message": "Approval request payload failed validation",
+            "details": details,
+        }
+    }
+
+
+def _map_approval_validation_code(*, path: str, error_type: str) -> str:
+    if path == "decision":
+        if error_type == "missing":
+            return "MISSING_APPROVAL_DECISION"
+        return "INVALID_APPROVAL_DECISION"
+
+    if path == "approver_id":
+        if error_type in {"missing", "string_too_short"}:
+            return "MISSING_APPROVER_ID"
+        return "INVALID_APPROVER_ID"
+
+    return "REQUEST_VALIDATION_ERROR"

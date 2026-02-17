@@ -493,6 +493,31 @@ Request:
 
 `approver_id` must be a non-empty, non-whitespace string.
 
+Validation error response (v0 draft):
+
+```json
+{
+  "error": {
+    "code": "REQUEST_VALIDATION_ERROR",
+    "message": "Approval request payload failed validation",
+    "details": [
+      {
+        "path": "decision",
+        "message": "Input should be 'approved' or 'rejected'",
+        "type": "literal_error",
+        "code": "INVALID_APPROVAL_DECISION"
+      },
+      {
+        "path": "approver_id",
+        "message": "String should have at least 1 character",
+        "type": "string_too_short",
+        "code": "MISSING_APPROVER_ID"
+      }
+    ]
+  }
+}
+```
+
 Response (v0 draft):
 
 ```json
