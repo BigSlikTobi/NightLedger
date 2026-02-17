@@ -421,6 +421,87 @@ def test_post_approval_rejects_whitespace_only_approver_id() -> None:
     )
 
     assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "REQUEST_VALIDATION_ERROR"
+    assert body["error"]["message"] == "Approval request payload failed validation"
+    assert body["error"]["details"] == [
+        {
+            "path": "approver_id",
+            "message": "String should have at least 1 character",
+            "type": "string_too_short",
+            "code": "MISSING_APPROVER_ID",
+        }
+    ]
+
+
+def test_post_approval_rejects_invalid_decision_with_structured_envelope() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    ingest(
+        build_event_payload(
+            event_id="evt_invalid_decision_target",
+            run_id="run_invalid_decision_target",
+            timestamp="2026-02-16T16:05:00Z",
+            event_type="approval_requested",
+            requires_approval=True,
+            approval_status="pending",
+            requested_by="agent",
+        )
+    )
+
+    response = client.post(
+        "/v1/approvals/evt_invalid_decision_target",
+        json={"decision": "accept", "approver_id": "human_approver"},
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "REQUEST_VALIDATION_ERROR"
+    assert body["error"]["message"] == "Approval request payload failed validation"
+    assert body["error"]["details"] == [
+        {
+            "path": "decision",
+            "message": "Input should be 'approved' or 'rejected'",
+            "type": "literal_error",
+            "code": "INVALID_APPROVAL_DECISION",
+        }
+    ]
+
+
+def test_post_approval_rejects_missing_approver_with_structured_envelope() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    ingest(
+        build_event_payload(
+            event_id="evt_missing_approver_target",
+            run_id="run_missing_approver_target",
+            timestamp="2026-02-16T16:06:00Z",
+            event_type="approval_requested",
+            requires_approval=True,
+            approval_status="pending",
+            requested_by="agent",
+        )
+    )
+
+    response = client.post(
+        "/v1/approvals/evt_missing_approver_target",
+        json={"decision": "approved"},
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "REQUEST_VALIDATION_ERROR"
+    assert body["error"]["message"] == "Approval request payload failed validation"
+    assert body["error"]["details"] == [
+        {
+            "path": "approver_id",
+            "message": "Field required",
+            "type": "missing",
+            "code": "MISSING_APPROVER_ID",
+        }
+    ]
 
 
 def test_post_approval_returns_storage_write_error_on_resolution_append_failure() -> None:
