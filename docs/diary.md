@@ -1461,3 +1461,87 @@ cleanup, generated artifact history handling, and `.gitignore` alignment.
   aligned.
 - Added `tests/test_issue66_repo_hygiene_docs.py` to keep this policy
   test-enforced.
+
+---
+
+## 🗓️ 2026-02-17: Issue #12 — Runtime Hardening for Ingest + Approval Rule Parity
+
+### 🎯 Objective
+
+Enforce remaining business-rule gaps at write-time so illegal approval
+transitions are rejected at `POST /v1/events`, while preserving deterministic
+projection behavior and structured 4xx error contracts.
+
+### Round 1 — Approval-requested pending semantics
+
+1. **Goal Re-Read:** Re-validated Issue #12 scope and MVP governance constraints
+   in `spec/BUSINESS_RULES.md` + `spec/API.md`.
+2. **Pattern Investigation:** Confirmed ingest path only ran schema validation
+   and could persist semantically invalid approval receipts.
+3. **Failing Tests:** Added ingest test rejecting `approval_requested` with
+   non-pending approval status.
+4. **Implementation:** Introduced governance-layer validation service and
+   `BUSINESS_RULE_VIOLATION` envelope (`rule_id` included).
+5. **Verification:** Ran targeted test + full suite.
+
+### Round 2 — Resolved-only-from-pending enforcement
+
+1. **Goal Re-Read:** Reconfirmed transition rule:
+   `approval_resolved` must resolve an active pending gate.
+2. **Pattern Investigation:** Found resolved events could be ingested without
+   pending context, deferring failure to projection time.
+3. **Failing Tests:** Added ingest rejection test for resolution without pending
+   gate.
+4. **Implementation:** Added pending-context check based on current run
+   projection; mapped violations to `RULE-GATE-002`.
+5. **Verification:** Updated projection-focused tests to seed invalid histories
+   directly in store (not via ingest), then ran full suite.
+
+### Round 3 — Resolver identity requirement
+
+1. **Goal Re-Read:** Revalidated requirement that resolved approvals must carry
+   human resolver identity.
+2. **Pattern Investigation:** Confirmed ingest accepted missing
+   `approval.resolved_by`.
+3. **Failing Tests:** Added ingest rejection for missing approver identity.
+4. **Implementation:** Added `MISSING_APPROVER_ID` enforcement in governance
+   validator with `RULE-GATE-007`.
+5. **Verification:** Targeted + full-suite pass.
+
+### Round 4 — Resolution timestamp requirement
+
+1. **Goal Re-Read:** Confirmed resolved approvals must include
+   `approval.resolved_at`.
+2. **Pattern Investigation:** Confirmed ingest accepted resolved approvals with
+   null resolution timestamp.
+3. **Failing Tests:** Added ingest rejection for missing resolution timestamp.
+4. **Implementation:** Added `MISSING_APPROVAL_TIMESTAMP` enforcement with
+   `RULE-GATE-008`.
+5. **Verification:** Targeted + full-suite pass.
+
+### Round 5 — Terminal-run write guard + approval error rule IDs
+
+1. **Goal Re-Read:** Reconfirmed terminal-state mutation guard and structured
+   actionable rule references for approval flows.
+2. **Pattern Investigation:** Found terminal runs still accepted additional
+   writes; approval endpoint 4xx envelopes lacked explicit rule references.
+3. **Failing Tests:** Added ingest rejection for writes after terminal marker
+   and approval API assertions for `rule_ids`.
+4. **Implementation:** Added terminal-state ingest guard
+   (`TERMINAL_STATE_CONFLICT`, `RULE-GATE-005`) and surfaced rule IDs in
+   approval endpoint errors (`NO_PENDING_APPROVAL`, `DUPLICATE_APPROVAL`,
+   request validation).
+5. **Verification:** Targeted tests + full-suite run.
+
+### ✅ Final Audit Summary
+
+- **Docs-first updates** applied in `spec/API.md` before each behavioral change.
+- **New governance layer:** `src/nightledger_api/services/business_rules_service.py`
+  enforces ingest-time business rules with rule-aware structured errors.
+- **API hardening:** `POST /v1/events` now runs schema + governance checks
+  before append.
+- **Approval envelope parity:** approval endpoint 4xx responses now include
+  rule references (`rule_ids`) for actionable operator debugging.
+- **Projection coverage preserved:** tests that intentionally validate
+  inconsistent historical streams now seed those streams directly in the store.
+- **Verification result:** `177 passed` (`./.venv/bin/python -m pytest -q`).

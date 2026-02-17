@@ -257,6 +257,7 @@ def test_post_approval_rejects_duplicate_resolution_for_same_target() -> None:
     assert second_response.status_code == 409
     body = second_response.json()
     assert body["error"]["code"] == "DUPLICATE_APPROVAL"
+    assert body["error"]["rule_ids"] == ["RULE-GATE-003"]
 
 
 def test_post_approval_rejects_target_that_is_not_pending_approval() -> None:
@@ -282,6 +283,7 @@ def test_post_approval_rejects_target_that_is_not_pending_approval() -> None:
     assert response.status_code == 409
     body = response.json()
     assert body["error"]["code"] == "NO_PENDING_APPROVAL"
+    assert body["error"]["rule_ids"] == ["RULE-GATE-002"]
 
 
 def test_post_approval_rejects_ambiguous_event_id_across_runs() -> None:
@@ -397,6 +399,7 @@ def test_post_approval_returns_duplicate_for_stale_resolved_target_with_new_pend
     assert stale_response.status_code == 409
     body = stale_response.json()
     assert body["error"]["code"] == "DUPLICATE_APPROVAL"
+    assert body["error"]["rule_ids"] == ["RULE-GATE-003"]
 
 
 def test_post_approval_rejects_whitespace_only_approver_id() -> None:
@@ -424,6 +427,7 @@ def test_post_approval_rejects_whitespace_only_approver_id() -> None:
     body = response.json()
     assert body["error"]["code"] == "REQUEST_VALIDATION_ERROR"
     assert body["error"]["message"] == "Approval request payload failed validation"
+    assert body["error"]["rule_ids"] == ["RULE-GATE-007"]
     assert body["error"]["details"] == [
         {
             "path": "approver_id",
@@ -459,6 +463,7 @@ def test_post_approval_rejects_invalid_decision_with_structured_envelope() -> No
     body = response.json()
     assert body["error"]["code"] == "REQUEST_VALIDATION_ERROR"
     assert body["error"]["message"] == "Approval request payload failed validation"
+    assert body["error"]["rule_ids"] == ["RULE-GATE-004"]
     assert body["error"]["details"] == [
         {
             "path": "decision",
@@ -494,6 +499,7 @@ def test_post_approval_rejects_missing_approver_with_structured_envelope() -> No
     body = response.json()
     assert body["error"]["code"] == "REQUEST_VALIDATION_ERROR"
     assert body["error"]["message"] == "Approval request payload failed validation"
+    assert body["error"]["rule_ids"] == ["RULE-GATE-007"]
     assert body["error"]["details"] == [
         {
             "path": "approver_id",

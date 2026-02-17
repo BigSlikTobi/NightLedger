@@ -10,6 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
 from nightledger_api.controllers.events_controller import get_event_store  # noqa: E402
 from nightledger_api.main import app  # noqa: E402
+from nightledger_api.services.event_ingest_service import validate_event_payload  # noqa: E402
 from nightledger_api.services.event_store import InMemoryAppendOnlyEventStore, StoredEvent  # noqa: E402
 
 client = TestClient(app)
@@ -57,6 +58,11 @@ def build_event_payload(
 def ingest(payload: dict[str, Any]) -> None:
     response = client.post("/v1/events", json=payload)
     assert response.status_code == 201, response.json()
+
+
+def append_direct(store: InMemoryAppendOnlyEventStore, payload: dict[str, Any]) -> None:
+    event = validate_event_payload(payload)
+    store.append(event)
 
 
 @pytest.fixture(autouse=True)
@@ -232,7 +238,8 @@ def test_issue34_round1_get_run_journal_surfaces_approval_timeline_inconsistency
     store = InMemoryAppendOnlyEventStore()
     app.dependency_overrides[get_event_store] = lambda: store
 
-    ingest(
+    append_direct(
+        store,
         build_event_payload(
             event_id="evt_timeline_inconsistent",
             run_id="run_timeline_inconsistent",
@@ -260,7 +267,8 @@ def test_issue34_round2_get_run_journal_is_deterministically_ordered_for_realist
     store = InMemoryAppendOnlyEventStore()
     app.dependency_overrides[get_event_store] = lambda: store
 
-    ingest(
+    append_direct(
+        store,
         build_event_payload(
             event_id="evt_order_late",
             run_id="run_order_realistic",
@@ -276,7 +284,8 @@ def test_issue34_round2_get_run_journal_is_deterministically_ordered_for_realist
             reason="within policy",
         )
     )
-    ingest(
+    append_direct(
+        store,
         build_event_payload(
             event_id="evt_order_early",
             run_id="run_order_realistic",
@@ -356,7 +365,8 @@ def test_issue34_round5_get_run_journal_inconsistency_uses_full_error_envelope()
     store = InMemoryAppendOnlyEventStore()
     app.dependency_overrides[get_event_store] = lambda: store
 
-    ingest(
+    append_direct(
+        store,
         build_event_payload(
             event_id="evt_issue34_inconsistent",
             run_id="run_issue34_inconsistent",

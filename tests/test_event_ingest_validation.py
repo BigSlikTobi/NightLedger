@@ -2,14 +2,26 @@ from pathlib import Path
 import sys
 from datetime import timedelta, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
+from nightledger_api.controllers.events_controller import get_event_store  # noqa: E402
 from nightledger_api.main import app  # noqa: E402
 from nightledger_api.services.event_ingest_service import validate_event_payload  # noqa: E402
+from nightledger_api.services.event_store import InMemoryAppendOnlyEventStore  # noqa: E402
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_dependencies() -> None:
+    app.dependency_overrides.clear()
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    yield
+    app.dependency_overrides.clear()
 
 
 def valid_event_payload() -> dict[str, object]:
@@ -420,3 +432,186 @@ def test_get_events_returns_method_not_allowed() -> None:
     response = client.get("/v1/events")
 
     assert response.status_code == 405
+
+
+def test_post_events_rejects_approval_requested_without_pending_status() -> None:
+    payload = valid_event_payload()
+    payload["id"] = "evt_invalid_approval_requested_status"
+    payload["type"] = "approval_requested"
+    payload["requires_approval"] = True
+    payload["approval"]["status"] = "not_required"
+
+    response = client.post("/v1/events", json=payload)
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+    assert body["error"]["details"] == [
+        {
+            "path": "approval.status",
+            "message": "approval_requested must use approval.status='pending'",
+            "type": "state_conflict",
+            "code": "INVALID_APPROVAL_TRANSITION",
+            "rule_id": "RULE-GATE-001",
+        }
+    ]
+
+
+def test_post_events_rejects_approval_requested_without_requires_approval() -> None:
+    payload = valid_event_payload()
+    payload["id"] = "evt_invalid_approval_requested_requires_flag"
+    payload["type"] = "approval_requested"
+    payload["requires_approval"] = False
+    payload["approval"]["status"] = "pending"
+
+    response = client.post("/v1/events", json=payload)
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+    assert body["error"]["details"] == [
+        {
+            "path": "requires_approval",
+            "message": "approval_requested must set requires_approval=true",
+            "type": "state_conflict",
+            "code": "INVALID_APPROVAL_TRANSITION",
+            "rule_id": "RULE-GATE-001",
+        }
+    ]
+
+
+def test_post_events_rejects_approval_resolved_without_pending_gate() -> None:
+    payload = valid_event_payload()
+    payload["id"] = "evt_invalid_approval_resolved_without_pending"
+    payload["type"] = "approval_resolved"
+    payload["requires_approval"] = True
+    payload["approval"]["status"] = "approved"
+    payload["approval"]["resolved_by"] = "human_reviewer"
+    payload["approval"]["resolved_at"] = "2026-02-14T13:00:00Z"
+
+    response = client.post("/v1/events", json=payload)
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+    assert body["error"]["details"] == [
+        {
+            "path": "approval",
+            "message": "approval_resolved encountered without pending approval",
+            "type": "state_conflict",
+            "code": "NO_PENDING_APPROVAL",
+            "rule_id": "RULE-GATE-002",
+        }
+    ]
+
+
+def test_post_events_rejects_resolved_approval_without_approver_id() -> None:
+    pending_payload = valid_event_payload()
+    pending_payload["id"] = "evt_pending_for_missing_approver"
+    pending_payload["type"] = "approval_requested"
+    pending_payload["requires_approval"] = True
+    pending_payload["approval"]["status"] = "pending"
+    pending_payload["approval"]["requested_by"] = "agent"
+    pending_payload["approval"]["resolved_by"] = None
+    pending_payload["approval"]["resolved_at"] = None
+    assert client.post("/v1/events", json=pending_payload).status_code == 201
+
+    invalid_resolution_payload = valid_event_payload()
+    invalid_resolution_payload["id"] = "evt_missing_approver_resolution"
+    invalid_resolution_payload["type"] = "approval_resolved"
+    invalid_resolution_payload["requires_approval"] = True
+    invalid_resolution_payload["approval"]["status"] = "approved"
+    invalid_resolution_payload["approval"]["requested_by"] = "agent"
+    invalid_resolution_payload["approval"]["resolved_by"] = None
+    invalid_resolution_payload["approval"]["resolved_at"] = "2026-02-14T13:00:10Z"
+
+    response = client.post("/v1/events", json=invalid_resolution_payload)
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+    assert body["error"]["details"] == [
+        {
+            "path": "approval.resolved_by",
+            "message": "approval_resolved is missing approver identity",
+            "type": "state_conflict",
+            "code": "MISSING_APPROVER_ID",
+            "rule_id": "RULE-GATE-007",
+        }
+    ]
+
+
+def test_post_events_rejects_resolved_approval_without_resolution_timestamp() -> None:
+    pending_payload = valid_event_payload()
+    pending_payload["id"] = "evt_pending_for_missing_resolution_ts"
+    pending_payload["type"] = "approval_requested"
+    pending_payload["requires_approval"] = True
+    pending_payload["approval"]["status"] = "pending"
+    pending_payload["approval"]["requested_by"] = "agent"
+    pending_payload["approval"]["resolved_by"] = None
+    pending_payload["approval"]["resolved_at"] = None
+    assert client.post("/v1/events", json=pending_payload).status_code == 201
+
+    invalid_resolution_payload = valid_event_payload()
+    invalid_resolution_payload["id"] = "evt_missing_resolution_ts"
+    invalid_resolution_payload["type"] = "approval_resolved"
+    invalid_resolution_payload["requires_approval"] = True
+    invalid_resolution_payload["approval"]["status"] = "approved"
+    invalid_resolution_payload["approval"]["requested_by"] = "agent"
+    invalid_resolution_payload["approval"]["resolved_by"] = "human_reviewer"
+    invalid_resolution_payload["approval"]["resolved_at"] = None
+
+    response = client.post("/v1/events", json=invalid_resolution_payload)
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+    assert body["error"]["details"] == [
+        {
+            "path": "approval.resolved_at",
+            "message": "approval_resolved is missing resolution timestamp",
+            "type": "state_conflict",
+            "code": "MISSING_APPROVAL_TIMESTAMP",
+            "rule_id": "RULE-GATE-008",
+        }
+    ]
+
+
+def test_post_events_rejects_mutating_event_after_terminal_run_state() -> None:
+    terminal_payload = valid_event_payload()
+    terminal_payload["id"] = "evt_terminal_marker"
+    terminal_payload["run_id"] = "run_terminal_guard"
+    terminal_payload["type"] = "summary"
+    terminal_payload["requires_approval"] = False
+    terminal_payload["approval"]["status"] = "not_required"
+    terminal_payload["approval"]["requested_by"] = None
+    terminal_payload["approval"]["resolved_by"] = None
+    terminal_payload["approval"]["resolved_at"] = None
+    terminal_payload["timestamp"] = "2026-02-14T13:00:00Z"
+    assert client.post("/v1/events", json=terminal_payload).status_code == 201
+
+    mutating_payload = valid_event_payload()
+    mutating_payload["id"] = "evt_after_terminal_marker"
+    mutating_payload["run_id"] = "run_terminal_guard"
+    mutating_payload["type"] = "action"
+    mutating_payload["requires_approval"] = False
+    mutating_payload["approval"]["status"] = "not_required"
+    mutating_payload["approval"]["requested_by"] = None
+    mutating_payload["approval"]["resolved_by"] = None
+    mutating_payload["approval"]["resolved_at"] = None
+    mutating_payload["timestamp"] = "2026-02-14T13:00:01Z"
+
+    response = client.post("/v1/events", json=mutating_payload)
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+    assert body["error"]["details"] == [
+        {
+            "path": "workflow_status",
+            "message": "event stream continued after terminal status 'completed'",
+            "type": "state_conflict",
+            "code": "TERMINAL_STATE_CONFLICT",
+            "rule_id": "RULE-GATE-005",
+        }
+    ]
