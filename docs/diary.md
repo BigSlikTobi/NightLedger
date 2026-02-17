@@ -88,6 +88,20 @@ and align fresh clone setup docs with the exact commands CI runs.
   `httpx` cannot be fetched from network-restricted pip mirrors. CI on GitHub
   should resolve this by installing dependencies from `requirements.txt`.
 
+### Issue #63 follow-up — CI compatibility hotfix (2026-02-17)
+
+- **Finding:** GitHub CI reported `23` failures due
+  `AttributeError: module 'starlette.status' has no attribute 'HTTP_422_UNPROCESSABLE_CONTENT'`.
+- **Fix:** Added a compatibility constant in
+  `src/nightledger_api/main.py`:
+  `SCHEMA_VALIDATION_STATUS_CODE = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", 422)`
+  and routed schema-validation responses through that constant.
+- **Regression test:** Added `tests/test_status_code_compat.py` to enforce
+  status constant compatibility across Starlette/FastAPI versions.
+- **Verification:** 
+  - `./.venv/bin/pytest -q tests/test_status_code_compat.py` (`1 passed`)
+  - `./.venv/bin/pytest -q tests/test_demo_script_issue54_docs.py tests/test_demo_setup_docs.py tests/test_journal_contract_docs.py tests/test_web_live_mode_docs.py tests/test_journal_projection.py tests/test_journal_projection_service.py` (`32 passed`)
+
 ## 🗓️ 2026-02-16: Issue #59 — Web UI live API mode (base URL + run selection UX) (5-Round cycle)
 
 ### 🎯 Objective
