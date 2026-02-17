@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Request, status
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -10,6 +12,7 @@ from nightledger_api.presenters.error_presenter import (
     present_duplicate_event_error,
     present_inconsistent_run_state_error,
     present_no_pending_approval_error,
+    present_approval_request_validation_error,
     present_run_not_found_error,
     present_schema_validation_error,
     present_storage_read_error,
@@ -43,6 +46,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(events_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def handle_request_validation_error(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    if request.method == "POST" and request.url.path.startswith("/v1/approvals/"):
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content=present_approval_request_validation_error(exc),
+        )
+    return await request_validation_exception_handler(request, exc)
 
 
 @app.exception_handler(SchemaValidationError)

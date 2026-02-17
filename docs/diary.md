@@ -8,6 +8,84 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-17: Issue #65 — Approval request validation envelopes (5-Round cycle)
+
+### 🎯 Objective
+
+Normalize request-body validation failures on `POST /v1/approvals/:eventId`
+into NightLedger structured error envelopes so downstream handlers receive
+deterministic `error.code`, `error.message`, and field-level `error.details`.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+### Round 1 — Contract confirmation and gap isolation
+
+1. **Goal Re-Read:** Confirmed #65 scope is limited to approval request-body
+   validation consistency.
+2. **Pattern Investigation:** Endpoint used FastAPI default request validation,
+   returning framework-native `detail` instead of NightLedger `error` envelope.
+3. **Failing Tests:** Strengthened existing whitespace-approver test to assert
+   structured envelope shape.
+4. **Implementation:** None (test-first round).
+5. **Verification:** Targeted tests failed on missing `error` envelope as
+   expected.
+
+### Round 2 — Invalid decision envelope contract
+
+1. **Goal Re-Read:** Confirmed deterministic decision-field errors are
+   required.
+2. **Pattern Investigation:** No test coverage for invalid `decision` enum
+   value.
+3. **Failing Tests:** Added approval API test asserting `literal_error` maps to
+   `INVALID_APPROVAL_DECISION` at path `decision`.
+4. **Implementation:** None (test-first round).
+5. **Verification:** New test failed with framework-default response body.
+
+### Round 3 — Missing approver envelope contract
+
+1. **Goal Re-Read:** Confirmed approver field-level deterministic codes are
+   required.
+2. **Pattern Investigation:** Missing `approver_id` path lacked explicit
+   structured contract test.
+3. **Failing Tests:** Added approval API test asserting missing `approver_id`
+   maps to `MISSING_APPROVER_ID`.
+4. **Implementation:** None (test-first round).
+5. **Verification:** New test failed with framework-default response body.
+
+### Round 4 — Structured validation mapping implementation
+
+1. **Goal Re-Read:** Keep existing approval success/error behavior unchanged
+   while normalizing only request validation shape.
+2. **Pattern Investigation:** Existing domain error presenters already provide
+   deterministic codes and path sorting pattern.
+3. **Failing Tests:** Existing Round 1–3 tests remained red.
+4. **Implementation:** Added request-validation presenter + endpoint-scoped
+   handler in `main.py` for `POST /v1/approvals/:eventId`, mapping decision and
+   approver validation errors into NightLedger envelope.
+5. **Verification:** `tests/test_approvals_api.py` green.
+
+### Round 5 — Docs + full-suite reconciliation
+
+1. **Goal Re-Read:** Confirmed issue expects canonical envelope behavior
+   documented and validated.
+2. **Pattern Investigation:** API spec had no structured 422 example for
+   approvals request validation.
+3. **Failing Tests:** Existing tests enforce envelope behavior for invalid
+   approval payloads.
+4. **Implementation:** Updated `spec/API.md` with structured validation error
+   example; preserved existing approval semantics.
+5. **Verification:** Full primary suite green (`155 passed`).
+
+### ✅ Final Audit Summary
+
+- **Goal-vs-implementation check:** #65 acceptance met for structured approval
+  payload validation envelopes with deterministic field-level codes.
+- **No behavior drift:** Existing approval success/error semantics remain
+  unchanged outside request-body validation formatting.
+- **Validation evidence:**
+  - `./.venv/bin/pytest -q tests/test_approvals_api.py` (`16 passed`)
+  - `./.venv/bin/pytest -q tests` (`155 passed`)
+
 ## 🗓️ 2026-02-16: Issue #59 — Web UI live API mode (base URL + run selection UX) (5-Round cycle)
 
 ### 🎯 Objective
