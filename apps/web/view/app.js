@@ -141,16 +141,23 @@ createApp({
           <div class="meta">
             <span class="pill">risk: {{ card.riskLabel }}</span>
             <span class="pill">approval: {{ card.approvalLabel }}</span>
+            <span class="pill" v-if="card.eventType">type: {{ card.eventType.toUpperCase() }}</span>
+            <span class="pill" v-if="card.actor">actor: {{ card.actor.toUpperCase() }}</span>
           </div>
 
-          <div class="evidence" v-if="card.evidenceLinks.length > 0">
+          <div class="muted" v-if="card.eventId || card.payloadPath">
+            <code v-if="card.eventId">event: {{ card.eventId }}</code>
+            <code v-if="card.payloadPath"> trace: {{ card.payloadPath }}</code>
+          </div>
+
+          <div class="evidence" v-if="card.evidenceItems.length > 0">
             <a
-              v-for="url in card.evidenceLinks"
-              :key="url"
-              :href="url"
+              v-for="item in card.evidenceItems"
+              :key="item.ref"
+              :href="item.ref"
               target="_blank"
               rel="noreferrer"
-            >evidence</a>
+            >{{ item.label }} ({{ item.kind }})</a>
           </div>
           <div class="evidence muted" v-else>no evidence links</div>
         </li>

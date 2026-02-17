@@ -1545,3 +1545,169 @@ projection behavior and structured 4xx error contracts.
 - **Projection coverage preserved:** tests that intentionally validate
   inconsistent historical streams now seed those streams directly in the store.
 - **Verification result:** `177 passed` (`./.venv/bin/python -m pytest -q`).
+
+---
+
+## 🗓️ 2026-02-17: Issue #15 — Journal Hardening for Evidence + Completion + Traceability
+
+### 🎯 Objective
+
+Enforce journal quality business rules as explicit, fail-loud runtime behavior:
+readability guarantees, risky-step evidence requirements, raw payload
+traceability, and completion constraints for summary events.
+
+### Round 1 — Risky action evidence enforcement at ingest
+
+1. **Goal Re-Read:** Confirmed issue demands enforceable evidence rules for risky
+   actions, not best-effort rendering.
+2. **Pattern Investigation:** Found schema allowed empty `evidence` arrays and
+   governance layer had no risky-action evidence guard.
+3. **Failing Tests:** Added
+   `test_post_events_rejects_risky_action_without_evidence`.
+4. **Implementation:** Added `RULE-RISK-005` enforcement in
+   `validate_event_business_rules` with structured violation
+   `MISSING_RISK_EVIDENCE`.
+5. **Verification:** Targeted test passed; full suite passed.
+
+### Round 2 — Summary completion blocked while approvals are pending
+
+1. **Goal Re-Read:** Reconfirmed completed-state constraints must preserve human
+   approval integrity.
+2. **Pattern Investigation:** Found `summary` events could be ingested while a
+   run still had unresolved pending approval.
+3. **Failing Tests:** Added
+   `test_post_events_rejects_summary_when_pending_approval_exists`.
+4. **Implementation:** Added `RULE-GATE-010` pending-state guard for summary
+   events plus explicit completion field constraints.
+5. **Verification:** Targeted test passed; full suite passed.
+
+### Round 3 — Journal readability fail-loud contract
+
+1. **Goal Re-Read:** Revalidated requirement that timeline-visible entries must
+   be readable fields, not coercions.
+2. **Pattern Investigation:** Found projection coerced missing/blank
+   `type/title/details` into empty strings and still returned `200`.
+3. **Failing Tests:** Added
+   `test_issue15_round3_get_run_journal_fails_loud_on_missing_readability_fields`.
+4. **Implementation:** Added strict non-empty string checks in
+   `project_run_journal` returning `MISSING_TIMELINE_FIELDS`.
+5. **Verification:** Targeted test passed; full suite passed.
+
+### Round 4 — Traceability identity integrity in journal projection
+
+1. **Goal Re-Read:** Reconfirmed issue requires verifiable event-to-payload
+   linkage, not inferred trust.
+2. **Pattern Investigation:** Found projection generated `payload_ref` but did
+   not verify payload identity matched stored event identity.
+3. **Failing Tests:** Added
+   `test_issue15_round4_get_run_journal_fails_loud_on_traceability_identity_mismatch`.
+4. **Implementation:** Added payload identity checks
+   (`payload.id`, `payload.run_id`) with `TRACEABILITY_LINK_BROKEN`.
+5. **Verification:** Targeted test passed; full suite passed.
+
+### Round 5 — Risky evidence enforcement at projection boundary
+
+1. **Goal Re-Read:** Confirmed quality rules must remain enforced even for
+   malformed/legacy stored records reaching representation.
+2. **Pattern Investigation:** Found risky `action` records without evidence
+   could still be projected if inserted directly into store.
+3. **Failing Tests:** Added
+   `test_issue15_round5_get_run_journal_fails_loud_on_risky_action_without_evidence`.
+4. **Implementation:** Added projection guard requiring non-empty
+   `evidence_refs` for risky actions, raising `MISSING_RISK_EVIDENCE`.
+5. **Verification:** Targeted test passed; full suite passed.
+
+### ✅ Final Audit Summary
+
+- **Goal reconciliation:** all #15 requirements are now enforced in code paths,
+  with explicit structured failures instead of silent projection degradation.
+- **Docs-first compliance:** updated canonical contracts in `spec/API.md` and
+  `spec/BUSINESS_RULES.md` before each behavior change.
+- **Runtime enforcement coverage:**
+  - ingest governance: risky action evidence + summary completion constraints
+  - representation projection: readability, traceability identity, risky
+    evidence link guarantees
+- **Validation evidence:** `./.venv/bin/pytest -q` -> `182 passed`.
+
+---
+
+## 🗓️ 2026-02-17: UI Follow-Up — Canonical Journal Entry Mapping
+
+### 🎯 Objective
+
+Map live web timeline rendering to canonical journal `entries` so operators can
+see traceability, approval context, and evidence details directly in the UI.
+
+### Round 1 — Canonical readability/status field mapping
+
+1. **Goal Re-Read:** Confirmed live UI should consume canonical `entries`
+   payload fields (`entry_id`, `details`, nested metadata/status).
+2. **Pattern Investigation:** `timeline_model` still prioritized legacy fields
+   and missed nested journal status context.
+3. **Failing Tests:** Added
+   `round1 maps canonical journal entry readability and nested status metadata`
+   in `apps/web/model/journal.test.js`.
+4. **Implementation:** Mapped `id` from `entry_id/event_id`, `summary` from
+   `details`, `risk` from `metadata.risk_level`, approval from
+   `approval_context.status`.
+5. **Verification:** Web suite passed.
+
+### Round 2 — Evidence refs mapping
+
+1. **Goal Re-Read:** Reconfirmed evidence links must reflect canonical
+   `evidence_refs`.
+2. **Pattern Investigation:** mapper only consumed legacy
+   `evidence_links/evidenceLinks`.
+3. **Failing Tests:** Added
+   `round2 maps canonical evidence_refs into link targets and labeled evidence items`.
+4. **Implementation:** Added `normalizeEvidenceItems` for canonical refs and
+   exposed both `evidenceLinks` and labeled `evidenceItems`.
+5. **Verification:** Web suite passed.
+
+### Round 3 — Approval indicator fallback mapping
+
+1. **Goal Re-Read:** Reconfirmed approval state must remain visible even when
+   explicit status is absent but `approval_indicator` exists.
+2. **Pattern Investigation:** mapper defaulted to `NONE` without using
+   indicator fallback.
+3. **Failing Tests:** Added
+   `round3 derives approval label from approval_indicator when status is absent`.
+4. **Implementation:** Derived `approvalLabel` from `approval_indicator`
+   (`required`, `approved`, `rejected`) when status is missing.
+5. **Verification:** Web suite passed.
+
+### Round 4 — Traceability/actor metadata exposure
+
+1. **Goal Re-Read:** Reconfirmed operators need direct source trace and actor
+   context on cards.
+2. **Pattern Investigation:** model dropped `event_type`, `metadata.actor`,
+   and `payload_ref.path`.
+3. **Failing Tests:** Added
+   `round4 exposes canonical traceability and actor metadata on card model`.
+4. **Implementation:** Added `eventType`, `actor`, and `payloadPath` fields in
+   card view models.
+5. **Verification:** Web suite passed.
+
+### Round 5 — Template rendering of richer metadata
+
+1. **Goal Re-Read:** Reconfirmed mapping must be visible in the UI, not only in
+   JS objects.
+2. **Pattern Investigation:** template rendered only risk/approval pills and
+   generic evidence links.
+3. **Failing Tests:** Added
+   `apps/web/view/app.test.js` asserting template usage of canonical metadata
+   fields.
+4. **Implementation:** Rendered type/actor pills, trace line
+   (`event` + `payloadPath`), and labeled evidence links
+   (`label (kind)`).
+5. **Verification:** Ran web tests including new view tests.
+
+### ✅ Final Audit Summary
+
+- Live timeline now consumes canonical journal `entries` semantics while
+  preserving backward compatibility for demo fixtures.
+- Added explicit view tests and updated verification command in README and
+  `apps/web/package.json`.
+- **Validation evidence:**
+  - `cd apps/web && node --test model/*.test.js controller/*.test.js view/*.test.js`
+  - `./.venv/bin/pytest -q`

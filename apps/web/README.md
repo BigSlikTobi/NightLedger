@@ -75,6 +75,23 @@ Browser observability:
   - `approval_decision_failed`
 - Log payloads include run ID, event ID, decision, and approver ID when provided.
 
+## Journal Mapping (Live Mode)
+
+The web timeline maps `GET /v1/runs/{run_id}/journal` `entries` directly into
+cards.
+
+Primary live fields:
+- readability text: `title`, `details`
+- event identity: `entry_id`, `event_id`, `event_type`, `timestamp`
+- risk and actor context: `metadata.risk_level`, `metadata.actor`
+- approval state: `approval_context.status`, `approval_indicator`
+- evidence links: `evidence_refs[*].ref` (with label/kind when present)
+- traceability reference: `payload_ref.path` shown in card metadata
+
+Backward compatibility:
+- demo fixtures using `summary`, `approval_status`, and `evidence_links` are
+  still supported.
+
 Local cross-origin notes:
 - API allows CORS from local web origins:
   - `http://localhost:3000`
