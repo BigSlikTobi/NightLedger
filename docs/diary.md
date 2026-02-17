@@ -8,6 +8,46 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-17: Issue #64 — docs/spec source-of-truth reconciliation
+
+### 🎯 Objective
+
+Reconcile drift across README, architecture, API, schema, and business-rule
+docs so runtime behavior and contract language are consistent and test-locked.
+
+### What was changed
+
+- Updated `README.md` to define canonical source ownership for runtime/API/schema/rules docs.
+- Replaced outdated root quickstart commands with actual local run/test paths:
+  - `PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --reload --port 8001`
+  - `npm --prefix apps/web start`
+  - `./.venv/bin/pytest -q`
+  - `npm --prefix apps/web test`
+- Updated `docs/ARCHITECTURE.md` frontend/runtime references to real files under
+  `apps/web/view`, `apps/web/model`, and `apps/web/controller`.
+- Updated `spec/API.md` endpoint heading notation to canonical FastAPI-style
+  path parameters (`{run_id}`, `{event_id}`) and marked API doc ownership.
+- Expanded `spec/EVENT_SCHEMA.md` with canonical field naming, required vs
+  optional fields, and validation semantics.
+- Rewrote `spec/BUSINESS_RULES.md` to align field names and semantics with
+  schema/API/runtime (including confidence bounds as rejection with
+  `INVALID_CONFIDENCE_BOUNDS`, not clamping).
+- Added doc contract guardrails in
+  `tests/test_docs_source_of_truth_issue64.py`.
+
+### Validation
+
+- Executed issue-64 doc contract tests via direct Python test-function runner:
+  - `PASS test_round1_readme_quickstart_uses_real_runtime_commands`
+  - `PASS test_round2_architecture_frontend_section_uses_actual_paths`
+  - `PASS test_round3_api_contract_uses_canonical_path_parameter_notation`
+  - `PASS test_round4_business_rules_use_schema_field_names_and_runtime_semantics`
+  - `PASS test_round5_readme_defines_canonical_contract_sources`
+- Ran web regression suite:
+  - `npm --prefix apps/web test` (`18 passed`)
+- Note: `./.venv/bin/pytest` is not available in this worktree, so full Python
+  pytest execution could not be run here.
+
 ## 🗓️ 2026-02-16: Issue #59 — Web UI live API mode (base URL + run selection UX) (5-Round cycle)
 
 ### 🎯 Objective

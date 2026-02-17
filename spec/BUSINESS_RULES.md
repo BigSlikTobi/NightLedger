@@ -1,402 +1,246 @@
-# 📐 NightLedger Business Rules
+# NightLedger Business Rules
 
-This document defines the formal business logic for NightLedger. **Source of
-Truth:** These rules govern the `Governance Layer` and must be strictly
-enforced.
+This document defines canonical governance and projection rules for runtime
+behavior. This rule catalog uses the same field names as
+`spec/EVENT_SCHEMA.md` and `spec/API.md`.
 
-## ID Format
+## Canonical Naming
 
-Rules are identified by `RULE-[Category]-[Number]`.
-
-## Field Naming Convention
-
-> [!IMPORTANT]
-> The `EVENT_SCHEMA.md` uses short field names (`confidence`, `risk_level`).
-> This document uses descriptive names for clarity. The canonical mapping is:
->
-> | Schema Field | Business Rules Field | Valid Values               |
-> | ------------ | -------------------- | -------------------------- |
-> | `confidence` | `confidence`         | `0.0` – `1.0`              |
-> | `risk_level` | `risk_level`         | `low`, `medium`, `high`    |
-> | `type`       | `event_type`         | See RULE-CORE-005          |
-> | `actor`      | `actor`              | `agent`, `system`, `human` |
+| Contract field | Meaning |
+| --- | --- |
+| `id` | Event identifier, unique within a run |
+| `run_id` | Run partition key |
+| `type` | Event category |
+| `actor` | Event producer role |
+| `meta.workflow` | Workflow namespace label |
+| `meta.step` | Lifecycle step label |
 
 ## Constants
 
-| Constant               | Value | Rationale                               |
-| ---------------------- | ----- | --------------------------------------- |
-| `CONFIDENCE_THRESHOLD` | `0.4` | Below this, non-low risks are escalated |
-| `APPROVAL_TIMEOUT`     | TBD   | Max wait time before expiration         |
+| Constant | Value | Rationale |
+| --- | --- | --- |
+| `CONFIDENCE_THRESHOLD` | `0.4` | Advisory threshold for review intensity |
+| `APPROVAL_TIMEOUT` | TBD | Expiration boundary for pending approvals |
 
----
-
-## 🔴 Core Integrity (APPEND-ONLY)
+## Core Integrity (Append-Only)
 
 ### RULE-CORE-001: Run ID Requirement
 
-- **Feature:** Event Ingestion
-- **Needs:** `run_id` in the event payload
-- **Edge Case:** `run_id` is missing
-- **Business Rule:**
-  ```
-  IF run_id is missing
-  THEN reject event and return error("MISSING_RUN_ID")
-  ELSE process event
-  ```
+- Needs: `run_id`
+- Rule:
+  - IF `run_id` is missing or empty
+  - THEN reject with `MISSING_RUN_ID`
 
 ### RULE-CORE-002: Event ID Requirement
 
-- **Feature:** Event Ingestion
-- **Needs:** `event_id` in the event payload
-- **Edge Case:** `event_id` is missing entirely
-- **Business Rule:**
-  ```
-  IF event_id is missing
-  THEN reject event and return error("MISSING_EVENT_ID")
-  ELSE process event
-  ```
+- Needs: `id`
+- Rule:
+  - IF `id` is missing or empty
+  - THEN reject with `MISSING_EVENT_ID`
 
-### RULE-CORE-003: Duplicate Event Prevention
+### RULE-CORE-003: Duplicate Prevention
 
-- **Feature:** Event Ingestion
-- **Needs:** Unique `event_id` within the scope of a `run_id`
-- **Edge Case:** `event_id` is duplicated within `run_id`
-- **Business Rule:**
-  ```
-  IF event_id is duplicated within run_id
-  THEN reject event and return error("DUPLICATE_EVENT_ID")
-  ELSE process event
-  ```
+- Needs: `id`, `run_id`
+- Rule:
+  - IF `id` already exists within the same `run_id`
+  - THEN reject with `DUPLICATE_EVENT_ID`
 
 ### RULE-CORE-004: Timestamp Requirement
 
-- **Feature:** Event Ingestion
-- **Needs:** `timestamp` in the event payload
-- **Edge Case:** `timestamp` is missing entirely
-- **Business Rule:**
-  ```
-  IF timestamp is missing
-  THEN reject event and return error("MISSING_TIMESTAMP")
-  ELSE process event
-  ```
+- Needs: `timestamp`
+- Rule:
+  - IF `timestamp` is missing
+  - THEN reject with `MISSING_TIMESTAMP`
+  - IF `timestamp` is not timezone-aware
+  - THEN reject with `INVALID_TIMESTAMP`
 
-### RULE-CORE-005: Timestamp Ordering
+### RULE-CORE-005: Out-of-Order Receipt Handling
 
-- **Feature:** Event Stream Consistency
-- **Needs:** `timestamp` of current event, `timestamp` of last event
-- **Edge Case:** `timestamp` is earlier than `last_event_timestamp`
-  (out-of-order)
-- **Business Rule:**
-  ```
-  IF timestamp < last_event_timestamp
-  THEN append event and mark integrity_warning=true
-  ELSE append event to event_stream and return status("EVENT_INGESTED")
-  ```
+- Needs: current `timestamp`, prior `timestamp`
+- Rule:
+  - IF `timestamp` is older than the latest stored event in a run
+  - THEN append event and set `integrity_warning=true`
 
-### RULE-CORE-006: Event Type Requirement
+### RULE-CORE-006: Type Requirement
 
-- **Feature:** Event Ingestion
-- **Needs:** `event_type` in the event payload
-- **Edge Case:** `event_type` is missing
-- **Business Rule:**
-  ```
-  IF event_type is missing
-  THEN reject event and return error("MISSING_EVENT_TYPE")
-  ELSE process event
-  ```
+- Needs: `type`
+- Rule:
+  - IF `type` is missing
+  - THEN reject with `MISSING_EVENT_TYPE`
 
-### RULE-CORE-007: Event Type Validation
+### RULE-CORE-007: Type Validation
 
-- **Feature:** Event Ingestion
-- **Needs:** `event_type`, list of valid types
-  (`intent|action|observation|decision|approval_requested|approval_resolved|error|summary`)
-- **Edge Case:** `event_type` is not in the list of valid types
-- **Business Rule:**
-  ```
-  IF event_type not in valid_event_types
-  THEN reject event and return error("INVALID_EVENT_TYPE")
-  ELSE process event
-  ```
+- Needs: `type`
+- Valid values:
+  - `intent|action|observation|decision|approval_requested|approval_resolved|error|summary`
+- Rule:
+  - IF `type` is not in valid values
+  - THEN reject with `INVALID_EVENT_TYPE`
 
 ### RULE-CORE-008: Actor Validation
 
-- **Feature:** Event Ingestion
-- **Needs:** `actor`, list of valid actors (`agent|system|human`)
-- **Edge Case:** `actor` is missing or not in the list of valid actors
-- **Business Rule:**
-  ```
-  IF actor is missing OR actor not in valid_actors
-  THEN reject event and return error("INVALID_ACTOR")
-  ELSE process event
-  ```
+- Needs: `actor`
+- Valid values:
+  - `agent|system|human`
+- Rule:
+  - IF `actor` is missing or invalid
+  - THEN reject with `INVALID_ACTOR`
 
-### RULE-CORE-009: Title and Details Requirement
+### RULE-CORE-009: Readability Requirement
 
-- **Feature:** Timeline Readability
-- **Needs:** `title`, `details`
-- **Edge Case:** `title` or `details` is missing
-- **Business Rule:**
-  ```
-  IF title is missing OR details is missing
-  THEN reject event and return error("MISSING_TIMELINE_FIELDS")
-  ELSE process event
-  ```
+- Needs: `title`, `details`
+- Rule:
+  - IF `title` or `details` is missing/empty
+  - THEN reject with `MISSING_TIMELINE_FIELDS`
 
----
+## Risk Labeling
 
-## 🟡 Risk Labeling
+### RULE-RISK-001: Workflow Metadata Shape
 
-### RULE-RISK-001: Workflow ID Requirement
+- Needs: `meta.workflow`, `meta.step`
+- Rule:
+  - IF `meta` is present, both `meta.workflow` and `meta.step` must be
+    non-empty strings
 
-- **Feature:** Risk Assessment
-- **Needs:** `workflow_id`
-- **Edge Case:** `workflow_id` is empty or missing
-- **Business Rule:**
-  ```
-  IF workflow_id is empty
-  THEN reject event and return error("MISSING_WORKFLOW")
-  ELSE proceed to risk evaluation
-  ```
+### RULE-RISK-002: Risk Level Contract
 
-### RULE-RISK-002: Default Risk Classification
+- Needs: `risk_level`
+- Rule:
+  - `risk_level` may be omitted
+  - IF present, it must be `low|medium|high`
+  - otherwise reject with `INVALID_RISK_LEVEL`
 
-- **Feature:** Risk Assessment
-- **Needs:** `risk_level`
-- **Edge Case:** `risk_level` is missing in the event data
-- **Business Rule:**
-  ```
-  IF risk_level is missing
-  THEN set risk_level="unclassified" and continue
-  ELSE use provided risk_level
-  ```
+### RULE-RISK-003: Approval Flag and Status Consistency
 
-### RULE-RISK-003: Risk Name Requirement
+- Needs: `requires_approval`, `approval.status`
+- Rule:
+  - IF `requires_approval=true`, `approval.status` must be
+    `pending|approved|rejected`
+  - IF `requires_approval=false`, `approval.status` is typically
+    `not_required`
 
-- **Feature:** Risk Assessment
-- **Needs:** `risk_name`, `risk_level`
-- **Edge Case:** `risk_name` is missing when `risk_level` is present and not
-  "unclassified"
-- **Business Rule:**
-  ```
-  IF risk_level is present AND risk_level != "unclassified" AND risk_name is missing
-  THEN reject event and return error("MISSING_RISK_NAME")
-  ELSE process event
-  ```
+### RULE-RISK-004: Unknown Field Rejection
 
-### RULE-RISK-004: Known Risk Identification
+- Needs: payload shape
+- Rule:
+  - IF unknown fields are present at any schema level
+  - THEN reject with `UNKNOWN_FIELD`
 
-- **Feature:** Risk Assessment
-- **Needs:** `event_type`, Risk Catalog
-- **Edge Case:** `event_type` is NOT in the risk catalog (Unknown/Safe event)
-- **Business Rule:**
-  ```
-  IF event_type not in risk catalog
-  THEN set requires_approval=false and attach risk_label="NONE"
-  ELSE attach risk_label={risk_name,risk_level} and set requires_approval=true
-  ```
+## Approval Gate
 
----
+### RULE-GATE-001: Pending Approval Pauses Run
 
-## 🟠 Approval Gate
+- Needs: `type`, `requires_approval`, `approval.status`
+- Rule:
+  - IF event indicates pending approval (`approval_requested` or equivalent)
+  - THEN projected run status becomes `paused`
 
-### RULE-GATE-001: Risk Pauses Execution
+### RULE-GATE-002: No Pending Approval Rejection
 
-- **Feature:** Execution Governance
-- **Needs:** `requires_approval` flag, current `workflow_status`
-- **Edge Case:** Event requires approval AND workflow is NOT already paused
-- **Business Rule:**
-  ```
-  IF requires_approval=true AND workflow_status != "PAUSED"
-  THEN set workflow_status="PAUSED" and emit approval_request
-  ELSE continue execution or maintain paused state
-  ```
+- Needs: currently pending gate target
+- Rule:
+  - IF approval resolution is requested for a non-pending target
+  - THEN reject with `NO_PENDING_APPROVAL`
 
-### RULE-GATE-002: No Duplicate Approvals
+### RULE-GATE-003: Duplicate Approval Rejection
 
-- **Feature:** Manual Approval
-- **Needs:** `approval_submission`, `workflow_status`
-- **Edge Case:** Approval submitted while workflow is RUNNING (not PAUSED)
-- **Business Rule:**
-  ```
-  IF approval submitted AND workflow_status != "PAUSED"
-  THEN return error("NO_PENDING_APPROVAL")
-  ELSE process approval
-  ```
+- Needs: approval history for target
+- Rule:
+  - IF target was already resolved
+  - THEN reject with `DUPLICATE_APPROVAL`
 
-### RULE-GATE-003: Idempotent Approvals
+### RULE-GATE-004: Legal Resolution Transition
 
-- **Feature:** Manual Approval
-- **Needs:** `approval_status`
-- **Edge Case:** Approval for this event has already been resolved
-- **Business Rule:**
-  ```
-  IF approval already resolved
-  THEN return error("DUPLICATE_APPROVAL")
-  ELSE process approval
-  ```
+- Needs: `approval.status`
+- Rule:
+  - Legal transition is `pending -> approved|rejected`
+  - other transitions reject with `INVALID_APPROVAL_TRANSITION`
 
-### RULE-GATE-004: Approval Timeout
+### RULE-GATE-005: Rejection Terminal Behavior
 
-- **Feature:** Manual Approval
-- **Needs:** Time elapsed since approval request, `APPROVAL_TIMEOUT` threshold
-- **Edge Case:** Approval not received within `APPROVAL_TIMEOUT`
-- **Business Rule:**
-  ```
-  IF approval not received within APPROVAL_TIMEOUT
-  THEN set workflow_status="EXPIRED" and emit approval_expired
-  ELSE wait for approval
-  ```
+- Needs: resolution decision
+- Rule:
+  - IF approval resolves to `rejected`
+  - THEN run projects to rejection/terminal-stop semantics
 
-### RULE-GATE-005: Rejection Stops Run
+### RULE-GATE-006: Approved Canonical Demo Orchestration
 
-- **Feature:** Manual Approval
-- **Needs:** `approval_status`
-- **Edge Case:** `approval_status` is "REJECTED"
-- **Business Rule:**
-  ```
-  IF approval_status="REJECTED"
-  THEN set workflow_status="STOPPED" and emit approval_rejected
-  ELSE proceed to approval acceptance
-  ```
+- Needs: canonical `triage_inbox` run and gate target
+- Rule:
+  - IF canonical demo gate is approved
+  - THEN append explicit continuation receipts (`action`, then terminal
+    `summary`)
+  - IF continuation append fails
+  - THEN return `STORAGE_WRITE_ERROR` and append a fail-loud `error` receipt
 
-### RULE-GATE-006: Approval Resumes Run
+### RULE-GATE-007: Approver Requirement
 
-- **Feature:** Manual Approval
-- **Needs:** `approval_status`
-- **Edge Case:** `approval_status` is "APPROVED"
-- **Business Rule:**
-  ```
-  IF approval_status="APPROVED"
-  THEN set workflow_status="RUNNING" and emit approval_approved
-  ELSE handling rejection or valid states
-  ```
+- Needs: `approver_id` on approval API request
+- Rule:
+  - IF approval resolution request has empty `approver_id`
+  - THEN reject with schema validation failure
 
-### RULE-GATE-007: Approval State Machine
+### RULE-GATE-008: Resolution Timestamp Requirement
 
-- **Feature:** Approval Lifecycle
-- **Needs:** Current `approval.status`, requested transition
-- **Edge Case:** Invalid state transition (e.g., `not_required` → `approved`,
-  `rejected` → `approved`)
-- **Business Rule:**
-  ```
-  IF requested transition is not in valid_transitions
-  THEN reject and return error("INVALID_APPROVAL_TRANSITION")
-  ELSE apply transition
-  ```
-  Valid transitions: `not_required` → `pending` → `approved|rejected`
+- Needs: `approval.resolved_at` on resolved approval events
+- Rule:
+  - IF resolution event omits `approval.resolved_at`
+  - THEN projection fails with `MISSING_APPROVAL_TIMESTAMP`
 
-### RULE-GATE-008: Approver ID Requirement
+### RULE-GATE-009: Pending Approvals Deterministic Ordering
 
-- **Feature:** Manual Approval
-- **Needs:** `approver_id` (maps to `approval.resolved_by` in schema)
-- **Edge Case:** Approval is submitted without an `approver_id`
-- **Business Rule:**
-  ```
-  IF approval submitted AND approver_id is missing
-  THEN reject and return error("MISSING_APPROVER_ID")
-  ELSE process approval
-  ```
+- Needs: pending approval projection list
+- Rule:
+  - Pending approvals are sorted by requested time, then by identifier
 
-### RULE-GATE-009: Approval Timestamp Requirement
+## Confidence
 
-- **Feature:** Manual Approval
-- **Needs:** `approval_timestamp` (maps to `approval.resolved_at` in schema)
-- **Edge Case:** Approval is resolved but `approval_timestamp` is missing
-- **Business Rule:**
-  ```
-  IF approval resolved AND approval_timestamp is missing
-  THEN reject and return error("MISSING_APPROVAL_TIMESTAMP")
-  ELSE process approval
-  ```
+### RULE-CONF-001: Confidence Optionality
 
----
+- Needs: `confidence`
+- Rule:
+  - `confidence` is optional
 
-## 🔵 Confidence Scoring
+### RULE-CONF-002: Confidence Type Validation
 
-### RULE-CONF-001: Default Confidence
+- Needs: `confidence`
+- Rule:
+  - IF `confidence` is not numeric
+  - THEN reject with `INVALID_CONFIDENCE_TYPE`
 
-- **Feature:** Confidence Evaluation
-- **Needs:** `confidence`
-- **Edge Case:** `confidence` is missing
-- **Business Rule:**
-  ```
-  IF confidence is missing
-  THEN set confidence=0.5
-  ELSE use provided confidence
-  ```
+### RULE-CONF-003: Confidence Bounds Validation
 
-### RULE-CONF-002: Non-Numeric Confidence
+- Needs: `confidence`
+- Rule:
+  - IF `confidence` is outside `0.0..1.0`
+  - THEN reject with `INVALID_CONFIDENCE_BOUNDS`
 
-- **Feature:** Confidence Evaluation
-- **Needs:** `confidence`
-- **Edge Case:** `confidence` is not a valid number (string, null, NaN)
-- **Business Rule:**
-  ```
-  IF confidence is not a valid number
-  THEN reject event and return error("INVALID_CONFIDENCE_TYPE")
-  ELSE process confidence
-  ```
+### RULE-CONF-004: Confidence Is Observational
 
-### RULE-CONF-003: Confidence Bounds (Lower)
+- Needs: `confidence`, `risk_level`
+- Rule:
+  - Runtime stores provided confidence and risk values as receipts
+  - No automatic risk mutation is applied during ingestion
 
-- **Feature:** Confidence Evaluation
-- **Needs:** `confidence`
-- **Edge Case:** `confidence` < 0
-- **Business Rule:**
-  ```
-  IF confidence < 0
-  THEN set confidence=0
-  ELSE use provided confidence
-  ```
+### RULE-CONF-005: Threshold Is Governance Guidance
 
-### RULE-CONF-004: Confidence Bounds (Upper)
+- Needs: `CONFIDENCE_THRESHOLD`
+- Rule:
+  - Threshold is guidance for policy authors/reviewers
+  - It is not an implicit auto-rewrite rule in current ingestion contract
 
-- **Feature:** Confidence Evaluation
-- **Needs:** `confidence`
-- **Edge Case:** `confidence` > 1
-- **Business Rule:**
-  ```
-  IF confidence > 1
-  THEN set confidence=1
-  ELSE use provided confidence
-  ```
-
-### RULE-CONF-005: Low Confidence Escalation
-
-- **Feature:** Confidence Evaluation
-- **Needs:** `confidence`, `CONFIDENCE_THRESHOLD` (0.4), `risk_level`
-- **Edge Case:** Confidence is below threshold AND it is NOT already a minimal
-  risk
-- **Business Rule:**
-  ```
-  IF confidence < CONFIDENCE_THRESHOLD AND risk_level != "low"
-  THEN escalate risk_level="medium" and set requires_approval=true
-  ELSE attach confidence and continue
-  ```
-
----
-
-## 🟢 Visualization
+## Visualization
 
 ### RULE-VIS-001: Empty Heatmap
 
-- **Feature:** Risk Heatmap
-- **Needs:** List of events with risk levels
-- **Edge Case:** No events have a risk level other than "NONE"
-- **Business Rule:**
-  ```
-  IF no events have risk_level != "NONE"
-  THEN show empty_heatmap_state
-  ELSE render heatmap
-  ```
+- Needs: projected entries with `risk_level`
+- Rule:
+  - IF no entries have `risk_level`
+  - THEN show empty heatmap state
 
 ### RULE-VIS-002: Render Heatmap
 
-- **Feature:** Risk Heatmap
-- **Needs:** List of events with risk levels
-- **Edge Case:** Events exist with risk levels (Happy Path/Aggregated View)
-- **Business Rule:**
-  ```
-  IF events exist
-  THEN aggregate risk counts by risk_level (and optionally by time bucket) and render heatmap
-  ```
+- Needs: projected entries with `risk_level`
+- Rule:
+  - IF entries have risk labels
+  - THEN aggregate counts by `risk_level` and render
