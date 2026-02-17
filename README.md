@@ -52,19 +52,28 @@ We aren't just hacking; we're executing a vision. Check the specs:
 
 ---
 
-## 🛠️ Quick Start (Dev)
-
-> _Detailed setup coming soon. For now, we hack._
+## 🛠️ Quick Start (Fresh Clone)
 
 ```bash
 # Clone the repo
 git clone https://github.com/bigsliktobi/NightLedger.git
+cd NightLedger
 
-# Install dependencies (Monorepo)
-pnpm install
+# Backend dependencies
+python -m venv .venv
+./.venv/bin/pip install --upgrade pip
+./.venv/bin/pip install -r requirements.txt
+```
 
-# Run the stack
-pnpm dev
+## Local Verification (Matches CI)
+
+```bash
+# Backend regression suite
+./.venv/bin/pytest -q
+
+# Web regression suite
+cd apps/web
+node --test model/*.test.js controller/*.test.js
 ```
 
 ---
