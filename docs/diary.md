@@ -8,6 +8,24 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-17: Issue #67 — MCP + policy execution track consolidation
+
+### Summary
+
+Built a dependency-ordered MCP + policy execution track in
+`docs/MCP_POLICY_EXECUTION_TRACK.md` to consolidate open runtime backlog scope.
+The doc now defines phase sequencing for `#44` to `#49`, explicit non-overlap
+boundaries per retained issue, user-defined rule acceptance criteria with the
+100 EUR threshold example, and explicit NightLedger-vs-external MCP ownership.
+It also records superseded predecessor mapping for closed issues `#12` and
+`#13` and links the canonical successor track to issue `#67`.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_issue67_backlog_execution_track_docs.py`
+- `./.venv/bin/pytest -q`
+- `node --test model/*.test.js controller/*.test.js view/*.test.js`
+
 ## 🗓️ 2026-02-17: Issue #64 — docs/spec source-of-truth reconciliation
 
 ### 🎯 Objective
