@@ -1,65 +1,35 @@
 # <img src="docs/images/nightledger_logo.png" width="80" alt="NightLedger 3D Logo" /> NightLedger: Autonomy with Receipts.
 
-> **"The agent did... something."** ❌ **"The agent did X, here's why, here's
-> proof, and here's who signed off."** ✅
+NightLedger is an accountability layer for agent workflows: append-only event
+capture, governance gating for risky actions, and human-readable receipts.
 
----
+## Canonical Sources of Truth
 
-# 🏁 HACKATHON MODE: ON
+Use one primary document per concern to avoid contract drift:
 
-We are building the **Accountability Layer for the Agentic Era**. This is a
-high-velocity project. Things will break. But trust will be built.
+| Concern | Canonical source |
+| --- | --- |
+| Runtime behavior and layer boundaries | `docs/ARCHITECTURE.md` |
+| HTTP API contract and error envelopes | `spec/API.md` |
+| Event payload schema contract | `spec/EVENT_SCHEMA.md` |
+| Governance/risk/approval rule catalog | `spec/BUSINESS_RULES.md` |
 
-### <img src="https://img.shields.io/badge/DEADLINE-Feb_19_@_20:00_CET-D00000?style=for-the-badge&logo=clock&logoColor=white" alt="Deadline: Feb 19 @ 20:00 CET" />
+## Documentation Map
 
----
+| Doc | Purpose |
+| --- | --- |
+| `spec/MVP/discovery.md` | Strategy and problem framing |
+| `spec/MVP/MVP.md` | MVP scope and success criteria |
+| `spec/MVP/product_design.md` | Layered design principles |
+| `spec/MVP/roadmap.md` | Current execution roadmap |
+| `docs/API_TESTING.md` | Local API smoke flows |
+| `docs/DEMO_SCRIPT.md` | Reproducible demo handoff path |
 
-## 🚀 The Mission
-
-**Problem:** Everyone wants autonomous agents. Nobody wants the liability of
-autonomous mistakes. **Solution:** **NightLedger**. A lightweight, drop-in
-system that forces agents to "show their work" before they touch the real world.
-
-We bridge the gap between **Experiment** and **Production**.
-
----
-
-## ⚡ Key Features (MVP)
-
-- **📝 Append-Only Journal:** Every agent thought and action is immutably
-  recorded.
-- **🛑 The "Red Button" Protocol:** Risky actions (like spending money)
-  automatically **PAUSE** execution.
-- **✅ Human-in-the-Loop:** A slick UI for humans to review evidence and
-  authorize usage.
-- **📊 Real-Time Trust:** Live visualization of your agent's decision
-  confidence.
-
----
-
-## 📚 Documentation (The "Brains")
-
-We aren't just hacking; we're executing a vision. Check the specs:
-
-| Doc                                                 | Purpose                                 |
-| :-------------------------------------------------- | :-------------------------------------- |
-| **[Strategy & Discovery](./spec/MVP/discovery.md)** | Why this matters. The "Trust Gap."      |
-| **[The MVP Spec](./spec/MVP/MVP.md)**               | What we are building. The "Kano Model." |
-| **[Product Design](./spec/MVP/product_design.md)**  | How it works. The "Universal Schema."   |
-| **[THE ROADMAP](./spec/MVP/roadmap.md)**            | **What we are doing right now.**        |
-| **[API Draft](./spec/API.md)**                      | Runtime endpoint contracts + errors.    |
-| **[API Testing Guide](./docs/API_TESTING.md)**      | Local curl smoke checks for API flows.  |
-
----
-
-## 🛠️ Quick Start (Fresh Clone)
+## Quick Start (Fresh Clone)
 
 ```bash
-# Clone the repo
 git clone https://github.com/bigsliktobi/NightLedger.git
 cd NightLedger
-
-# Backend dependencies
 python -m venv .venv
 ./.venv/bin/pip install --upgrade pip
 ./.venv/bin/pip install -r requirements.txt
@@ -68,14 +38,36 @@ python -m venv .venv
 ## Local Verification (Matches CI)
 
 ```bash
-# Backend regression suite
 ./.venv/bin/pytest -q
-
-# Web regression suite
 cd apps/web
 node --test model/*.test.js controller/*.test.js
 ```
 
----
+## Quick Start (Local Runtime)
 
-_Built with ❤️, ☕, and a little bit of 🤖 by the NightLedger Team._
+### 1) Start API (Terminal A)
+
+```bash
+PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --reload --port 8001
+```
+
+### 2) Start web UI (Terminal B)
+
+```bash
+npm --prefix apps/web start
+```
+
+Open:
+
+```text
+http://localhost:3000/view/?mode=live&runId=run_triage_inbox_demo_1&apiBase=http://127.0.0.1:8001
+```
+
+## Local Demo Data Reset
+
+```bash
+bash tasks/reset_seed_triage_inbox_demo.sh
+```
+
+This seeds a deterministic paused run (`run_triage_inbox_demo_1`) for approval
+and journal demo flows.

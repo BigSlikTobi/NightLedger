@@ -1,5 +1,8 @@
 # API Draft v0
 
+This is the canonical HTTP contract source for NightLedger runtime endpoints,
+response envelopes, and endpoint-level behavior.
+
 ## POST /v1/events
 
 Ingest one event.
@@ -81,7 +84,7 @@ Duplicate event error response (v0 draft):
 }
 ```
 
-## GET /v1/runs/:runId/events
+## GET /v1/runs/{run_id}/events
 
 List events for a run (deterministic ascending by time).
 
@@ -105,7 +108,7 @@ Response (v0 draft):
 }
 ```
 
-## GET /v1/runs/:runId/status
+## GET /v1/runs/{run_id}/status
 
 Project current workflow status from immutable run events.
 
@@ -474,7 +477,7 @@ Issue links:
 - Parent: #5
 - Related constraints: #13, #15
 
-## POST /v1/approvals/:eventId
+## POST /v1/approvals/{event_id}
 
 Resolve pending approval.
 

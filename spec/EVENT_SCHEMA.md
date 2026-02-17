@@ -1,5 +1,51 @@
 # Event Schema v0
 
+This is the canonical payload schema for `POST /v1/events`.
+
+## Canonical Field Names
+
+All runtime/spec/rules docs use these names:
+
+- `id`
+- `run_id`
+- `timestamp`
+- `type`
+- `actor`
+- `title`
+- `details`
+- `confidence`
+- `risk_level`
+- `requires_approval`
+- `approval`
+- `evidence`
+- `meta.workflow`
+- `meta.step`
+
+## Required vs Optional
+
+Required fields for ingestion:
+
+- `id`, `run_id`, `timestamp`, `type`, `actor`, `title`, `details`, `approval`
+
+Optional fields:
+
+- `confidence` (`0.0..1.0` when present)
+- `risk_level` (`low|medium|high` when present)
+- `requires_approval` (defaults to `false`)
+- `evidence` (defaults to `[]`)
+- `meta` (`workflow` + `step` required only when `meta` is provided)
+
+## Validation Semantics
+
+- Unknown fields are rejected.
+- `timestamp` must include timezone information and is normalized to UTC.
+- `title` and `details` must be non-empty strings.
+- `approval.status` must be one of
+  `not_required|pending|approved|rejected`.
+- `evidence[*].kind` must be one of `log|url|artifact|diff`.
+
+## JSON Shape
+
 ```json
 {
   "id": "evt_...",
@@ -32,9 +78,3 @@
   }
 }
 ```
-
-## Notes
-- `title` + `details` are required for readable timeline output.
-- `confidence` is optional but recommended.
-- `timestamp` must include timezone information and is normalized to UTC.
-- `approval.status` must transition through a valid state machine.
