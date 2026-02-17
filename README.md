@@ -24,6 +24,7 @@ Use one primary document per concern to avoid contract drift:
 | `spec/MVP/roadmap.md` | Current execution roadmap |
 | `docs/API_TESTING.md` | Local API smoke flows |
 | `docs/DEMO_SCRIPT.md` | Reproducible demo handoff path |
+| `docs/REPO_HYGIENE.md` | Branch/artifact hygiene policy and cleanup workflow |
 
 ## Quick Start (Fresh Clone)
 
