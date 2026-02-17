@@ -8,6 +8,7 @@ from nightledger_api.controllers.events_controller import router as events_route
 from nightledger_api.presenters.error_presenter import (
     present_ambiguous_event_id_error,
     present_approval_not_found_error,
+    present_business_rule_validation_error,
     present_duplicate_approval_error,
     present_duplicate_event_error,
     present_inconsistent_run_state_error,
@@ -21,6 +22,7 @@ from nightledger_api.presenters.error_presenter import (
 from nightledger_api.services.errors import (
     AmbiguousEventIdError,
     ApprovalNotFoundError,
+    BusinessRuleValidationError,
     DuplicateApprovalError,
     DuplicateEventError,
     InconsistentRunStateError,
@@ -74,6 +76,17 @@ async def handle_schema_validation_error(
     return JSONResponse(
         status_code=HTTP_422_UNPROCESSABLE,
         content=present_schema_validation_error(exc),
+    )
+
+
+@app.exception_handler(BusinessRuleValidationError)
+async def handle_business_rule_validation_error(
+    request: Request, exc: BusinessRuleValidationError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=present_business_rule_validation_error(exc),
     )
 
 

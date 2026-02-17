@@ -12,6 +12,7 @@ Behavior:
 - Valid payload: `201 Created` with
   `{"status": "accepted", "event_id": "...", "integrity_warning": false}`
 - Invalid payload: `422 Unprocessable Entity`
+- Governance/business-rule violation: `409 Conflict`
 - Duplicate event ID within run: `409 Conflict`
 - Storage append failure: `500 Internal Server Error`
 
@@ -26,6 +27,17 @@ Field constraints:
 - `confidence` (if provided) must be between `0.0` and `1.0` (inclusive).
 - `timestamp` must include timezone and is normalized to UTC (`Z`) internally.
 - Unknown fields are rejected.
+
+Governance constraints (runtime/business-rule boundary):
+
+- `RULE-GATE-001`: `approval_requested` events must represent a pending gate
+  state (`requires_approval=true` and `approval.status=pending`).
+- `RULE-GATE-002`: `approval_resolved` events must be legal transitions from an
+  existing pending gate.
+- `RULE-GATE-007` and `RULE-GATE-008`: any `approved|rejected` approval status
+  requires resolver metadata (`approval.resolved_by` and
+  `approval.resolved_at`).
+- `RULE-GATE-005`: terminal runs reject additional mutating event writes.
 
 Validation error response (v0 draft):
 
@@ -45,6 +57,34 @@ Validation error response (v0 draft):
   }
 }
 ```
+
+Governance violation response (v0 draft):
+
+```json
+{
+  "error": {
+    "code": "BUSINESS_RULE_VIOLATION",
+    "message": "Event payload violates workflow governance rules",
+    "details": [
+      {
+        "path": "approval.status",
+        "message": "approval_requested must use approval.status='pending'",
+        "type": "state_conflict",
+        "code": "INVALID_APPROVAL_TRANSITION",
+        "rule_id": "RULE-GATE-001"
+      }
+    ]
+  }
+}
+```
+
+Common approval-gate violation detail codes:
+
+- `RULE-GATE-001`: `INVALID_APPROVAL_TRANSITION`
+- `RULE-GATE-002`: `NO_PENDING_APPROVAL`
+- `RULE-GATE-007`: `MISSING_APPROVER_ID`
+- `RULE-GATE-008`: `MISSING_APPROVAL_TIMESTAMP`
+- `RULE-GATE-005`: `TERMINAL_STATE_CONFLICT`
 
 Storage append error response (v0 draft):
 
@@ -500,6 +540,7 @@ Validation error response (v0 draft):
   "error": {
     "code": "REQUEST_VALIDATION_ERROR",
     "message": "Approval request payload failed validation",
+    "rule_ids": ["RULE-GATE-004", "RULE-GATE-007"],
     "details": [
       {
         "path": "decision",
@@ -621,6 +662,7 @@ Duplicate approval error response (v0 draft):
   "error": {
     "code": "DUPLICATE_APPROVAL",
     "message": "Approval already resolved",
+    "rule_ids": ["RULE-GATE-003"],
     "details": [
       {
         "path": "event_id",
@@ -640,6 +682,7 @@ No pending approval error response (v0 draft):
   "error": {
     "code": "NO_PENDING_APPROVAL",
     "message": "No pending approval for target event",
+    "rule_ids": ["RULE-GATE-002"],
     "details": [
       {
         "path": "event_id",

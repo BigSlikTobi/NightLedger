@@ -10,6 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 from nightledger_api.controllers.events_controller import get_event_store  # noqa: E402
 from nightledger_api.main import app  # noqa: E402
 from nightledger_api.services.errors import StorageReadError  # noqa: E402
+from nightledger_api.services.event_ingest_service import validate_event_payload  # noqa: E402
 from nightledger_api.services.event_store import InMemoryAppendOnlyEventStore  # noqa: E402
 
 client = TestClient(app)
@@ -61,6 +62,11 @@ def build_event_payload(
 def ingest(payload: dict[str, Any]) -> None:
     response = client.post("/v1/events", json=payload)
     assert response.status_code == 201, response.json()
+
+
+def append_direct(store: InMemoryAppendOnlyEventStore, payload: dict[str, Any]) -> None:
+    event = validate_event_payload(payload)
+    store.append(event)
 
 
 class _FailingStatusReadStore:
@@ -461,7 +467,8 @@ def test_get_run_status_returns_inconsistent_state_for_resolution_without_pendin
     store = InMemoryAppendOnlyEventStore()
     app.dependency_overrides[get_event_store] = lambda: store
 
-    ingest(
+    append_direct(
+        store,
         build_event_payload(
             event_id="evt_inconsistent_1",
             run_id="run_status_inconsistent",
@@ -517,7 +524,8 @@ def test_get_run_status_returns_inconsistent_state_for_duplicate_resolution() ->
             resolved_at="2026-02-15T19:01:00Z",
         )
     )
-    ingest(
+    append_direct(
+        store,
         build_event_payload(
             event_id="evt_dup_resolve_second",
             run_id="run_status_duplicate_resolution",
@@ -597,7 +605,8 @@ def test_get_run_status_returns_inconsistent_state_for_events_after_terminal() -
             approval_status="not_required",
         )
     )
-    ingest(
+    append_direct(
+        store,
         build_event_payload(
             event_id="evt_terminal_after",
             run_id="run_status_terminal_conflict",
@@ -683,7 +692,8 @@ def test_get_run_status_returns_inconsistent_state_for_missing_approver_id() -> 
             requested_by="agent",
         )
     )
-    ingest(
+    append_direct(
+        store,
         build_event_payload(
             event_id="evt_missing_approver_resolved",
             run_id="run_status_missing_approver",
@@ -726,7 +736,8 @@ def test_get_run_status_returns_inconsistent_state_for_missing_approval_timestam
             requested_by="agent",
         )
     )
-    ingest(
+    append_direct(
+        store,
         build_event_payload(
             event_id="evt_missing_timestamp_resolved",
             run_id="run_status_missing_timestamp",

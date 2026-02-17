@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from nightledger_api.services.errors import (
     AmbiguousEventIdError,
     ApprovalNotFoundError,
+    BusinessRuleValidationError,
     DuplicateApprovalError,
     DuplicateEventError,
     InconsistentRunStateError,
@@ -14,6 +15,25 @@ from nightledger_api.services.errors import (
     StorageReadError,
     StorageWriteError,
 )
+
+
+def present_business_rule_validation_error(exc: BusinessRuleValidationError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "BUSINESS_RULE_VIOLATION",
+            "message": "Event payload violates workflow governance rules",
+            "details": [
+                {
+                    "path": detail.path,
+                    "message": detail.message,
+                    "type": detail.type,
+                    "code": detail.code,
+                    "rule_id": detail.rule_id,
+                }
+                for detail in exc.details
+            ],
+        }
+    }
 
 
 def present_schema_validation_error(exc: SchemaValidationError) -> dict[str, Any]:
@@ -158,6 +178,7 @@ def present_no_pending_approval_error(exc: NoPendingApprovalError) -> dict[str, 
         "error": {
             "code": "NO_PENDING_APPROVAL",
             "message": "No pending approval for target event",
+            "rule_ids": ["RULE-GATE-002"],
             "details": [
                 {
                     "path": "event_id",
@@ -175,6 +196,7 @@ def present_duplicate_approval_error(exc: DuplicateApprovalError) -> dict[str, A
         "error": {
             "code": "DUPLICATE_APPROVAL",
             "message": "Approval already resolved",
+            "rule_ids": ["RULE-GATE-003"],
             "details": [
                 {
                     "path": "event_id",
@@ -191,6 +213,7 @@ def present_approval_request_validation_error(
     exc: RequestValidationError,
 ) -> dict[str, Any]:
     details: list[dict[str, str]] = []
+    rule_ids: set[str] = set()
 
     for error in exc.errors():
         loc = error.get("loc", ())
@@ -209,6 +232,9 @@ def present_approval_request_validation_error(
                 ),
             }
         )
+        rule_id = _map_approval_rule_id(details[-1]["code"])
+        if rule_id is not None:
+            rule_ids.add(rule_id)
 
     details.sort(key=lambda detail: (detail["path"], detail["code"], detail["type"]))
 
@@ -216,6 +242,7 @@ def present_approval_request_validation_error(
         "error": {
             "code": "REQUEST_VALIDATION_ERROR",
             "message": "Approval request payload failed validation",
+            "rule_ids": sorted(rule_ids),
             "details": details,
         }
     }
@@ -233,3 +260,12 @@ def _map_approval_validation_code(*, path: str, error_type: str) -> str:
         return "INVALID_APPROVER_ID"
 
     return "REQUEST_VALIDATION_ERROR"
+
+
+def _map_approval_rule_id(detail_code: str) -> str | None:
+    mapping = {
+        "MISSING_APPROVAL_DECISION": "RULE-GATE-004",
+        "INVALID_APPROVAL_DECISION": "RULE-GATE-004",
+        "MISSING_APPROVER_ID": "RULE-GATE-007",
+    }
+    return mapping.get(detail_code)

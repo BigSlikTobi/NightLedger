@@ -6,11 +6,13 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from nightledger_api.services.approval_service import list_pending_approvals, resolve_pending_approval
+from nightledger_api.services.business_rules_service import validate_event_business_rules
 from nightledger_api.services.event_ingest_service import validate_event_payload
 from nightledger_api.services.event_store import EventStore, InMemoryAppendOnlyEventStore
 from nightledger_api.services.errors import (
     AmbiguousEventIdError,
     ApprovalNotFoundError,
+    BusinessRuleValidationError,
     DuplicateApprovalError,
     DuplicateEventError,
     InconsistentRunStateError,
@@ -237,8 +239,15 @@ def ingest_event(
 ) -> dict[str, Any]:
     event = validate_event_payload(payload)
     try:
+        existing_events = store.list_by_run_id(event.run_id)
+        validate_event_business_rules(event=event, existing_events=existing_events)
         stored = store.append(event)
-    except (DuplicateEventError, StorageWriteError):
+    except (
+        BusinessRuleValidationError,
+        DuplicateEventError,
+        StorageReadError,
+        StorageWriteError,
+    ):
         raise
     except Exception as exc:  # pragma: no cover - defensive wrapper
         raise StorageWriteError("storage backend append failed") from exc
