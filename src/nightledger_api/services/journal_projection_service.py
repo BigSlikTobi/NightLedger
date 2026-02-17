@@ -124,6 +124,16 @@ def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournal
                 detail_code="INVALID_EVENT_PAYLOAD",
                 detail_type="state_conflict",
             )
+        _assert_traceability_identity(payload=payload, event=event)
+        event_type = _required_readable_field(payload, "type")
+        title = _required_readable_field(payload, "title")
+        details = _required_readable_field(payload, "details")
+        evidence_refs = _evidence_refs(payload.get("evidence"))
+        _assert_risky_action_has_evidence(
+            event_type=event_type,
+            payload=payload,
+            evidence_refs=evidence_refs,
+        )
         approval_raw = payload.get("approval", {})
         approval = approval_raw if isinstance(approval_raw, dict) else {}
 
@@ -132,9 +142,9 @@ def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournal
                 entry_id=f"jrnl_{run_id}_{index:04d}",
                 event_id=event.id,
                 timestamp=_format_timestamp(event.timestamp),
-                event_type=_string(payload.get("type")),
-                title=_string(payload.get("title")),
-                details=_string(payload.get("details")),
+                event_type=event_type,
+                title=title,
+                details=details,
                 payload_ref=PayloadRef(
                     run_id=run_id,
                     event_id=event.id,
@@ -154,7 +164,7 @@ def project_run_journal(*, run_id: str, events: list[StoredEvent]) -> RunJournal
                     "risk_level": _optional_string(payload.get("risk_level")),
                     "integrity_warning": event.integrity_warning,
                 },
-                evidence_refs=_evidence_refs(payload.get("evidence")),
+                evidence_refs=evidence_refs,
                 approval_indicator=_approval_indicator(payload, approval),
             )
         )
@@ -166,6 +176,58 @@ def _string(value: Any) -> str:
     if isinstance(value, str):
         return value
     return str(value) if value is not None else ""
+
+
+def _required_readable_field(payload: dict[str, Any], field: str) -> str:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise InconsistentRunStateError(
+            detail_path=field,
+            detail_message=f"journal field '{field}' must be a non-empty string",
+            detail_code="MISSING_TIMELINE_FIELDS",
+            detail_type="state_conflict",
+        )
+    return value
+
+
+def _assert_traceability_identity(*, payload: dict[str, Any], event: StoredEvent) -> None:
+    payload_id = payload.get("id")
+    if not isinstance(payload_id, str) or payload_id != event.id:
+        raise InconsistentRunStateError(
+            detail_path="payload.id",
+            detail_message="payload.id must match stored event id for traceability",
+            detail_code="TRACEABILITY_LINK_BROKEN",
+            detail_type="state_conflict",
+        )
+
+    payload_run_id = payload.get("run_id")
+    if not isinstance(payload_run_id, str) or payload_run_id != event.run_id:
+        raise InconsistentRunStateError(
+            detail_path="payload.run_id",
+            detail_message="payload.run_id must match stored run id for traceability",
+            detail_code="TRACEABILITY_LINK_BROKEN",
+            detail_type="state_conflict",
+        )
+
+
+def _assert_risky_action_has_evidence(
+    *,
+    event_type: str,
+    payload: dict[str, Any],
+    evidence_refs: list[dict[str, str]],
+) -> None:
+    risk_level = payload.get("risk_level")
+    requires_approval = bool(payload.get("requires_approval", False))
+    is_risky_action = event_type == "action" and (
+        risk_level == "high" or requires_approval
+    )
+    if is_risky_action and not evidence_refs:
+        raise InconsistentRunStateError(
+            detail_path="evidence",
+            detail_message="risky action journal entries must include evidence links",
+            detail_code="MISSING_RISK_EVIDENCE",
+            detail_type="state_conflict",
+        )
 
 
 def _optional_string(value: Any) -> str | None:

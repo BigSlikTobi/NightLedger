@@ -338,9 +338,12 @@ def test_post_events_rejects_incomplete_evidence_item() -> None:
 
 
 def test_post_events_accepts_empty_evidence_array() -> None:
-    """Test empty evidence array is accepted (default value)."""
+    """Test empty evidence array is accepted for non-risky actions."""
     payload = valid_event_payload()
     payload["id"] = "evt_empty_evidence"
+    payload["risk_level"] = "low"
+    payload["requires_approval"] = False
+    payload["approval"]["status"] = "not_required"
     payload["evidence"] = []
 
     response = client.post("/v1/events", json=payload)
@@ -615,3 +618,74 @@ def test_post_events_rejects_mutating_event_after_terminal_run_state() -> None:
             "rule_id": "RULE-GATE-005",
         }
     ]
+
+
+def test_post_events_rejects_risky_action_without_evidence() -> None:
+    payload = valid_event_payload()
+    payload["id"] = "evt_risky_action_no_evidence"
+    payload["type"] = "action"
+    payload["risk_level"] = "high"
+    payload["requires_approval"] = True
+    payload["approval"]["status"] = "pending"
+    payload["evidence"] = []
+
+    response = client.post("/v1/events", json=payload)
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "error": {
+            "code": "BUSINESS_RULE_VIOLATION",
+            "message": "Event payload violates workflow governance rules",
+            "details": [
+                {
+                    "path": "evidence",
+                    "message": "risky action events must include at least one evidence item",
+                    "type": "state_conflict",
+                    "code": "MISSING_RISK_EVIDENCE",
+                    "rule_id": "RULE-RISK-005",
+                }
+            ],
+        }
+    }
+
+
+def test_post_events_rejects_summary_when_pending_approval_exists() -> None:
+    pending_payload = valid_event_payload()
+    pending_payload["id"] = "evt_pending_before_summary"
+    pending_payload["run_id"] = "run_summary_guard_pending"
+    pending_payload["type"] = "approval_requested"
+    pending_payload["requires_approval"] = True
+    pending_payload["approval"]["status"] = "pending"
+    pending_payload["approval"]["requested_by"] = "agent"
+    pending_payload["timestamp"] = "2026-02-14T13:00:00Z"
+    assert client.post("/v1/events", json=pending_payload).status_code == 201
+
+    summary_payload = valid_event_payload()
+    summary_payload["id"] = "evt_summary_with_pending"
+    summary_payload["run_id"] = "run_summary_guard_pending"
+    summary_payload["type"] = "summary"
+    summary_payload["requires_approval"] = False
+    summary_payload["approval"]["status"] = "not_required"
+    summary_payload["approval"]["requested_by"] = None
+    summary_payload["approval"]["resolved_by"] = None
+    summary_payload["approval"]["resolved_at"] = None
+    summary_payload["timestamp"] = "2026-02-14T13:00:01Z"
+
+    response = client.post("/v1/events", json=summary_payload)
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "error": {
+            "code": "BUSINESS_RULE_VIOLATION",
+            "message": "Event payload violates workflow governance rules",
+            "details": [
+                {
+                    "path": "approval",
+                    "message": "summary cannot complete a run while approval is still pending",
+                    "type": "state_conflict",
+                    "code": "PENDING_APPROVAL_EXISTS",
+                    "rule_id": "RULE-GATE-010",
+                }
+            ],
+        }
+    }
