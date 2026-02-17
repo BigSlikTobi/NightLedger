@@ -234,6 +234,132 @@ def test_round5_get_run_journal_surfaces_inconsistent_state_for_invalid_payload(
     assert body["error"]["details"][0]["code"] == "INVALID_EVENT_PAYLOAD"
 
 
+class _MissingReadableFieldsJournalStore:
+    def append(self, event: Any) -> Any:
+        _ = event
+        raise RuntimeError("append should not be called")
+
+    def list_by_run_id(self, run_id: str) -> list[Any]:
+        return [
+            StoredEvent(
+                id="evt_missing_title",
+                timestamp=datetime.fromisoformat("2026-02-17T16:30:00+00:00"),
+                run_id=run_id,
+                payload={
+                    "id": "evt_missing_title",
+                    "run_id": run_id,
+                    "timestamp": "2026-02-17T16:30:00Z",
+                    "type": "action",
+                    "actor": "agent",
+                    "title": "",
+                    "details": "store returned payload with missing readability field",
+                    "confidence": 0.8,
+                    "risk_level": "low",
+                    "requires_approval": False,
+                    "approval": {"status": "not_required"},
+                    "evidence": [],
+                },
+                integrity_warning=False,
+            )
+        ]
+
+
+def test_issue15_round3_get_run_journal_fails_loud_on_missing_readability_fields() -> None:
+    app.dependency_overrides[get_event_store] = lambda: _MissingReadableFieldsJournalStore()
+
+    response = client.get("/v1/runs/run_missing_readability/journal")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
+    assert body["error"]["details"][0]["path"] == "title"
+    assert body["error"]["details"][0]["code"] == "MISSING_TIMELINE_FIELDS"
+
+
+class _TraceabilityMismatchJournalStore:
+    def append(self, event: Any) -> Any:
+        _ = event
+        raise RuntimeError("append should not be called")
+
+    def list_by_run_id(self, run_id: str) -> list[Any]:
+        return [
+            StoredEvent(
+                id="evt_source_id",
+                timestamp=datetime.fromisoformat("2026-02-17T16:45:00+00:00"),
+                run_id=run_id,
+                payload={
+                    "id": "evt_drifted_payload_id",
+                    "run_id": run_id,
+                    "timestamp": "2026-02-17T16:45:00Z",
+                    "type": "action",
+                    "actor": "agent",
+                    "title": "Traceability drift",
+                    "details": "store returned payload identity that mismatches source event",
+                    "confidence": 0.8,
+                    "risk_level": "low",
+                    "requires_approval": False,
+                    "approval": {"status": "not_required"},
+                    "evidence": [],
+                },
+                integrity_warning=False,
+            )
+        ]
+
+
+def test_issue15_round4_get_run_journal_fails_loud_on_traceability_identity_mismatch() -> None:
+    app.dependency_overrides[get_event_store] = lambda: _TraceabilityMismatchJournalStore()
+
+    response = client.get("/v1/runs/run_traceability_mismatch/journal")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
+    assert body["error"]["details"][0]["path"] == "payload.id"
+    assert body["error"]["details"][0]["code"] == "TRACEABILITY_LINK_BROKEN"
+
+
+class _RiskyActionWithoutEvidenceJournalStore:
+    def append(self, event: Any) -> Any:
+        _ = event
+        raise RuntimeError("append should not be called")
+
+    def list_by_run_id(self, run_id: str) -> list[Any]:
+        return [
+            StoredEvent(
+                id="evt_risky_no_evidence",
+                timestamp=datetime.fromisoformat("2026-02-17T16:50:00+00:00"),
+                run_id=run_id,
+                payload={
+                    "id": "evt_risky_no_evidence",
+                    "run_id": run_id,
+                    "timestamp": "2026-02-17T16:50:00Z",
+                    "type": "action",
+                    "actor": "agent",
+                    "title": "High-risk transfer",
+                    "details": "risky action stored without evidence links",
+                    "confidence": 0.8,
+                    "risk_level": "high",
+                    "requires_approval": True,
+                    "approval": {"status": "pending"},
+                    "evidence": [],
+                },
+                integrity_warning=False,
+            )
+        ]
+
+
+def test_issue15_round5_get_run_journal_fails_loud_on_risky_action_without_evidence() -> None:
+    app.dependency_overrides[get_event_store] = lambda: _RiskyActionWithoutEvidenceJournalStore()
+
+    response = client.get("/v1/runs/run_risky_without_evidence/journal")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "INCONSISTENT_RUN_STATE"
+    assert body["error"]["details"][0]["path"] == "evidence"
+    assert body["error"]["details"][0]["code"] == "MISSING_RISK_EVIDENCE"
+
+
 def test_issue34_round1_get_run_journal_surfaces_approval_timeline_inconsistency() -> None:
     store = InMemoryAppendOnlyEventStore()
     app.dependency_overrides[get_event_store] = lambda: store

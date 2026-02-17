@@ -126,6 +126,14 @@ behavior. This rule catalog uses the same field names as
   - IF unknown fields are present at any schema level
   - THEN reject with `UNKNOWN_FIELD`
 
+### RULE-RISK-005: Risky Action Evidence Requirement
+
+- Needs: `type`, `risk_level`, `requires_approval`, `evidence`
+- Rule:
+  - IF `type=action` and (`risk_level=high` OR `requires_approval=true`)
+  - THEN `evidence` must contain at least one item
+  - otherwise reject with `MISSING_RISK_EVIDENCE`
+
 ## Approval Gate
 
 ### RULE-GATE-001: Pending Approval Pauses Run
@@ -193,6 +201,15 @@ behavior. This rule catalog uses the same field names as
 - Rule:
   - Pending approvals are sorted by requested time, then by identifier
 
+### RULE-GATE-010: Summary Completion Requires Closed Approval State
+
+- Needs: `type`, `requires_approval`, `approval.status`, run pending state
+- Rule:
+  - IF `type=summary`, THEN `requires_approval` must be `false`
+  - IF `type=summary`, THEN `approval.status` must be `not_required`
+  - IF `type=summary` and run has unresolved pending approval
+  - THEN reject with `PENDING_APPROVAL_EXISTS`
+
 ## Confidence
 
 ### RULE-CONF-001: Confidence Optionality
@@ -244,3 +261,29 @@ behavior. This rule catalog uses the same field names as
 - Rule:
   - IF entries have risk labels
   - THEN aggregate counts by `risk_level` and render
+
+### RULE-VIS-003: Journal Readability Fields Must Be Present
+
+- Needs: projected journal entry `type`, `title`, `details`
+- Rule:
+  - IF an event is rendered in the journal timeline
+  - THEN `type`, `title`, and `details` must be non-empty strings
+  - otherwise projection fails with `MISSING_TIMELINE_FIELDS`
+
+### RULE-VIS-004: Journal Traceability Identity Must Match Source Event
+
+- Needs: stored event identity (`id`, `run_id`) and payload identity
+- Rule:
+  - IF journal projection renders an event
+  - THEN `payload.id` must equal stored event `id`
+  - THEN `payload.run_id` must equal stored event `run_id`
+  - otherwise projection fails with `TRACEABILITY_LINK_BROKEN`
+
+### RULE-VIS-005: Journal Risky Action Entries Must Include Evidence Links
+
+- Needs: projected journal entry `type`, risk signal, evidence references
+- Rule:
+  - IF journal entry represents risky `action` (`risk_level=high` OR
+    `requires_approval=true`)
+  - THEN projected `evidence_refs` must include at least one item
+  - otherwise projection fails with `MISSING_RISK_EVIDENCE`

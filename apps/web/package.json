@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test model/*.test.js controller/*.test.js",
+    "test": "node --test model/*.test.js controller/*.test.js view/*.test.js",
     "start": "npx serve ."
   }
 }

@@ -102,6 +102,55 @@ def validate_event_business_rules(
                 )
             )
 
+    if event.type == "summary":
+        if event.requires_approval:
+            violations.append(
+                BusinessRuleViolationDetail(
+                    path="requires_approval",
+                    message="summary events must set requires_approval=false",
+                    type="state_conflict",
+                    code="INVALID_SUMMARY_COMPLETION",
+                    rule_id="RULE-GATE-010",
+                )
+            )
+        if event.approval.status != "not_required":
+            violations.append(
+                BusinessRuleViolationDetail(
+                    path="approval.status",
+                    message="summary events must use approval.status='not_required'",
+                    type="state_conflict",
+                    code="INVALID_SUMMARY_COMPLETION",
+                    rule_id="RULE-GATE-010",
+                )
+            )
+        projection = (
+            existing_projection
+            if existing_projection is not None
+            else _project_existing_run_status(existing_events)
+        )
+        if projection is not None and projection.pending_approval is not None:
+            violations.append(
+                BusinessRuleViolationDetail(
+                    path="approval",
+                    message="summary cannot complete a run while approval is still pending",
+                    type="state_conflict",
+                    code="PENDING_APPROVAL_EXISTS",
+                    rule_id="RULE-GATE-010",
+                )
+            )
+
+    if event.type == "action" and (event.risk_level == "high" or event.requires_approval):
+        if len(event.evidence) == 0:
+            violations.append(
+                BusinessRuleViolationDetail(
+                    path="evidence",
+                    message="risky action events must include at least one evidence item",
+                    type="state_conflict",
+                    code="MISSING_RISK_EVIDENCE",
+                    rule_id="RULE-RISK-005",
+                )
+            )
+
     if violations:
         raise BusinessRuleValidationError(violations)
 

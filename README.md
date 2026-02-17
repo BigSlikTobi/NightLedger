@@ -41,7 +41,7 @@ python -m venv .venv
 ```bash
 ./.venv/bin/pytest -q
 cd apps/web
-node --test model/*.test.js controller/*.test.js
+node --test model/*.test.js controller/*.test.js view/*.test.js
 ```
 
 ## Quick Start (Local Runtime)

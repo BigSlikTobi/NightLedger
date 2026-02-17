@@ -34,6 +34,11 @@ Governance constraints (runtime/business-rule boundary):
   state (`requires_approval=true` and `approval.status=pending`).
 - `RULE-GATE-002`: `approval_resolved` events must be legal transitions from an
   existing pending gate.
+- `RULE-RISK-005`: risky `action` events (`risk_level=high` or
+  `requires_approval=true`) must include at least one evidence item.
+- `RULE-GATE-010`: `summary` events are only legal for completion when no
+  pending approval exists and summary approval fields indicate closed
+  non-gated state.
 - `RULE-GATE-007` and `RULE-GATE-008`: any `approved|rejected` approval status
   requires resolver metadata (`approval.resolved_by` and
   `approval.resolved_at`).
@@ -85,6 +90,11 @@ Common approval-gate violation detail codes:
 - `RULE-GATE-007`: `MISSING_APPROVER_ID`
 - `RULE-GATE-008`: `MISSING_APPROVAL_TIMESTAMP`
 - `RULE-GATE-005`: `TERMINAL_STATE_CONFLICT`
+- `RULE-GATE-010`: `PENDING_APPROVAL_EXISTS`, `INVALID_SUMMARY_COMPLETION`
+
+Common risk-governance violation detail codes:
+
+- `RULE-RISK-005`: `MISSING_RISK_EVIDENCE`
 
 Storage append error response (v0 draft):
 
@@ -247,6 +257,13 @@ Additional inconsistent-state cases:
   `INCONSISTENT_RUN_STATE` with detail code `MISSING_APPROVER_ID`.
 - `approval_resolved` event missing `approval.resolved_at` returns
   `INCONSISTENT_RUN_STATE` with detail code `MISSING_APPROVAL_TIMESTAMP`.
+- journal projection entries missing readable `type`, `title`, or `details`
+  return `INCONSISTENT_RUN_STATE` with detail code `MISSING_TIMELINE_FIELDS`.
+- journal projection events whose `payload.id`/`payload.run_id` do not match the
+  stored event identity return `INCONSISTENT_RUN_STATE` with detail code
+  `TRACEABILITY_LINK_BROKEN`.
+- journal projection risky `action` entries without evidence links return
+  `INCONSISTENT_RUN_STATE` with detail code `MISSING_RISK_EVIDENCE`.
 - Any non-terminal event encountered after status `rejected` returns
   `INCONSISTENT_RUN_STATE` with detail code `REJECTED_STATE_CONFLICT`.
 - Any non-terminal event encountered after a terminal status marker (`completed`,
