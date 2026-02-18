@@ -70,4 +70,10 @@ def _configured_threshold_eur() -> float:
     configured = os.getenv(_PURCHASE_APPROVAL_THRESHOLD_ENV)
     if configured is None:
         return _DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR
-    return float(configured)
+    # Treat empty or invalid values as misconfiguration and fall back to default
+    try:
+        if configured.strip() == "":
+            return _DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR
+        return float(configured)
+    except ValueError:
+        return _DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR
