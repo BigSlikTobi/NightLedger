@@ -8,6 +8,80 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #75 — remote MCP transport wrapper (5-Round cycle)
+
+### Summary
+
+Implemented issue `#75` remote MCP transport scope end-to-end:
+
+- Added a network MCP entrypoint at `POST /v1/mcp/remote`.
+- Added a shared MCP protocol core in `src/nightledger_api/mcp_protocol.py`
+  used by both stdio and remote wrappers.
+- Added fail-closed token auth boundary for remote transport using
+  `NIGHTLEDGER_MCP_REMOTE_AUTH_TOKEN` with support for `Bearer` or `X-API-Key`
+  headers.
+- Added parity tests proving `authorize_action` decision identity across HTTP,
+  stdio MCP, and remote MCP.
+- Added closure artifacts:
+  `docs/artifacts/issue-75/sub_issues.md` and
+  `docs/artifacts/issue-75/gap_assessment.md`.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+1. **Round 1 — Contract and sub-issue baseline**
+   - Added failing docs-lock tests for issue-75 planning and operator docs.
+   - Created sub-issue breakdown artifact and updated API/README remote
+     transport docs.
+2. **Round 2 — Shared MCP core extraction**
+   - Added failing tests for shared MCP handler usage.
+   - Extracted MCP protocol/tool logic into `mcp_protocol.py` and rewired stdio
+     wrapper to use it.
+3. **Round 3 — Remote transport happy path**
+   - Added failing remote end-to-end tests for `initialize`, `tools/list`, and
+     `tools/call`.
+   - Implemented `mcp_remote_server.py` with strict JSON-RPC handling.
+4. **Round 4 — Auth fail-closed hardening**
+   - Added failing tests for missing/invalid token and misconfigured auth
+     runtime.
+   - Implemented structured auth failure envelopes and fail-closed responses.
+5. **Round 5 — Parity proof and closure assessment**
+   - Added failing tests for cross-entrypoint decision parity and closure docs.
+   - Added issue-75 gap assessment and finalized diary evidence.
+
+### Validation
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_mcp_shared_protocol.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_mcp_remote_server.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_issue75_remote_mcp_docs.py tests/test_issue75_remote_mcp_parity.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+
+### Key Findings
+
+- Issue `#75` acceptance criteria is now satisfied for remote MCP network
+  access, shared deterministic tool behavior, and fail-closed auth checks.
+- Remaining open scope is clearly separated: #76 adoption bootstrap/versioning,
+  #49 deterministic end-to-end demo packaging, and #62 parent cleanup closure.
+
+### SOTA Hardening Pass (follow-up)
+
+Applied an additional hardening pass to align remote transport with current MCP
+streamable HTTP expectations:
+
+- Added session lifecycle support with `MCP-Session-Id` on initialize and
+  session-bound `MCP-Protocol-Version` checks on subsequent requests.
+- Added `GET /v1/mcp/remote` SSE stream support and
+  `DELETE /v1/mcp/remote` session termination.
+- Added fail-closed `Origin` allowlist enforcement via
+  `NIGHTLEDGER_MCP_REMOTE_ALLOWED_ORIGINS`.
+- Added OAuth protected-resource metadata endpoint at
+  `/.well-known/oauth-protected-resource` and bearer challenge header on 401.
+- Updated parity tests and operator docs to match the hardened transport flow.
+
+Validation:
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+- `cd apps/web && node --test model/*.test.js controller/*.test.js view/*.test.js`
+
 ## 🗓️ 2026-02-18: Issue #48 — tamper-evident audit receipts (5-Round cycle)
 
 ### Summary

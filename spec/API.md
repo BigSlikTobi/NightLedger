@@ -186,6 +186,67 @@ Unsupported currency example:
 }
 ```
 
+## MCP remote server: streamable HTTP `authorize_action` tool
+
+NightLedger also exposes MCP over network transport for off-machine clients.
+
+Remote endpoint:
+
+- `POST /v1/mcp/remote`
+- `GET /v1/mcp/remote`
+- `DELETE /v1/mcp/remote`
+
+Supported MCP methods:
+
+- `initialize`
+- `notifications/initialized`
+- `tools/list`
+- `tools/call`
+
+Auth boundary (required):
+
+- `Authorization: Bearer <token>`
+- `X-API-Key: <token>`
+- Token source is runtime config:
+  `NIGHTLEDGER_MCP_REMOTE_AUTH_TOKEN`
+- Origin allowlist runtime config:
+  `NIGHTLEDGER_MCP_REMOTE_ALLOWED_ORIGINS`
+
+Failure behavior:
+
+- Missing/invalid auth => JSON-RPC error response with `error.code=-32001`.
+- Disallowed `Origin` => JSON-RPC error response with `error.code=-32006`.
+- Invalid JSON-RPC payload => standard JSON-RPC errors (`-32700`, `-32600`,
+  `-32602`, `-32601`).
+- Non-initialize calls without session id => `error.code=-32003`.
+- Unknown session id => `error.code=-32004`.
+- Missing MCP protocol header on session requests => `error.code=-32005`.
+
+Session lifecycle:
+
+- `initialize` creates a transport session and returns header
+  `MCP-Session-Id`.
+- Subsequent `POST`, `GET` stream, and `DELETE` calls must include:
+  - `MCP-Session-Id`
+  - `MCP-Protocol-Version`
+- `DELETE /v1/mcp/remote` terminates the session.
+
+Streamable HTTP behavior:
+
+- `GET /v1/mcp/remote` with `Accept: text/event-stream` opens an SSE stream
+  for server notifications in the active session.
+- `POST /v1/mcp/remote` may return SSE when
+  `Accept: text/event-stream` is requested.
+
+OAuth-ready metadata endpoint:
+
+- `GET /.well-known/oauth-protected-resource`
+- Auth server list is configurable via
+  `NIGHTLEDGER_MCP_REMOTE_AUTHORIZATION_SERVERS`.
+
+Remote `tools/call` uses the same `authorize_action` logic and schema contract
+as HTTP `POST /v1/mcp/authorize_action` and MCP stdio transport.
+
 ## POST /v1/events
 
 Ingest one event.
