@@ -273,3 +273,62 @@ This artifact captures end-to-end `triage_inbox` proof points:
 ```bash
 ./.venv/bin/pytest -q
 ```
+
+## Token-Gated Purchase Flow to Live UI (Issue #47)
+
+This verifies the complete API path and confirms the resulting receipts are
+visible in live UI for the same `run_id`.
+
+### 1) Start API with persistent stores
+
+```bash
+PYTHONPATH=src \
+NIGHTLEDGER_EVENT_STORE_BACKEND=sqlite \
+NIGHTLEDGER_EVENT_STORE_DB_PATH=/tmp/nightledger_events_demo.db \
+NIGHTLEDGER_EXECUTION_TOKEN_SECRET='nightledger-demo-secret-material-32bytes!!' \
+NIGHTLEDGER_EXECUTION_REPLAY_DB_PATH=/tmp/nightledger_replay_demo.db \
+./.venv/bin/python -m uvicorn nightledger_api.main:app --port 8002
+```
+
+### 2) Start UI and open live run
+
+```bash
+npm --prefix apps/web start
+```
+
+Open:
+
+```text
+http://localhost:3000/view/?mode=live&runId=run_ui_demo_1&apiBase=http://127.0.0.1:8002
+```
+
+### 3) Send API requests for the same run
+
+```bash
+BASE=http://127.0.0.1:8002
+RUN_ID=run_ui_demo_1
+
+ALLOW=$(curl -sS -X POST $BASE/v1/mcp/authorize_action \
+  -H "Content-Type: application/json" \
+  -d "{\"intent\":{\"action\":\"purchase.create\"},\"context\":{\"run_id\":\"$RUN_ID\",\"request_id\":\"req_ui_1\",\"amount\":100,\"currency\":\"EUR\",\"merchant\":\"ACME GmbH\"}}")
+
+TOKEN=$(echo "$ALLOW" | ./.venv/bin/python -c 'import sys,json; print(json.load(sys.stdin).get("execution_token",""))')
+
+curl -sS -X POST $BASE/v1/executors/purchase.create \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"run_id\":\"$RUN_ID\",\"amount\":100,\"currency\":\"EUR\",\"merchant\":\"ACME GmbH\"}"
+```
+
+### 4) Expected live timeline cards
+
+- `authorize_action decision recorded`
+- `execution token minted`
+- `purchase.create executed`
+
+Optional blocked-path checks:
+
+- Replay same token to produce `purchase.create blocked` with
+  `EXECUTION_TOKEN_REPLAYED`.
+- Send mismatched merchant to produce `purchase.create blocked` with
+  `EXECUTION_PAYLOAD_MISMATCH`.
