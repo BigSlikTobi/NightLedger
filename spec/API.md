@@ -47,6 +47,31 @@ Optional context fields:
   appended to that run and become available in journal/status projections.
 - `merchant`: optional merchant descriptor used for payload-bound token hash.
 
+## Bot pause/wait/resume contract (Issue #49 v1)
+
+Real bot integrations use `MCP + HTTP` in v1:
+
+- MCP decision step: `tools/call` / `POST /v1/mcp/authorize_action`.
+- Approval lifecycle + execution steps: HTTP endpoints.
+
+Decision semantics are normative:
+
+- `allow => proceed`
+- `requires_approval => pause`
+- `deny => abort`
+
+Approval lifecycle endpoints used after `requires_approval`:
+
+- `POST /v1/approvals/requests` (explicit registration required)
+- `GET /v1/approvals/decisions/{decision_id}` (bot polls status)
+- `POST /v1/approvals/decisions/{decision_id}/execution-token`
+- `POST /v1/executors/purchase.create`
+
+Polling defaults:
+
+- interval: 2s
+- timeout: 300s
+
 ## MCP stdio server: `authorize_action` tool
 
 NightLedger also exposes the same transport contract through a local MCP stdio

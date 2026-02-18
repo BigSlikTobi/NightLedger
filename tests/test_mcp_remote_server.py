@@ -103,6 +103,7 @@ def test_remote_mcp_tools_call_over_http_returns_deterministic_decision(
     assert body["id"] == 3
     assert body["result"]["structuredContent"]["state"] == "requires_approval"
     assert body["result"]["structuredContent"]["reason_code"] == "AMOUNT_ABOVE_THRESHOLD"
+    assert "execution_token" not in body["result"]["structuredContent"]
 
 
 def test_remote_mcp_rejects_missing_session_on_non_initialize(monkeypatch) -> None:

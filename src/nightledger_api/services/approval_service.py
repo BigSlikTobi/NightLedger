@@ -234,15 +234,23 @@ def get_approval_decision_state(*, store: EventStore, decision_id: str) -> dict[
     if not decision_events:
         raise ApprovalNotFoundError(event_id=decision_id, detail_path="decision_id")
 
+    lifecycle_events = [
+        event
+        for event in decision_events
+        if _is_pending_signal(event) or _is_resolution_signal(event)
+    ]
+    if not lifecycle_events:
+        raise ApprovalNotFoundError(event_id=decision_id, detail_path="decision_id")
+
     requested_event: StoredEvent | None = None
     resolved_event: StoredEvent | None = None
-    for event in decision_events:
+    for event in lifecycle_events:
         if _is_pending_signal(event) and requested_event is None:
             requested_event = event
         if _is_resolution_signal(event):
             resolved_event = event
 
-    anchor_event = resolved_event or requested_event or decision_events[-1]
+    anchor_event = resolved_event or requested_event or lifecycle_events[-1]
     approval_payload = anchor_event.payload.get("approval", {})
     status = approval_payload.get("status")
 

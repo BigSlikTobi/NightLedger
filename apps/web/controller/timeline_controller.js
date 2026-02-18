@@ -45,9 +45,10 @@ export function createTimelineController({
     emit();
 
     try {
-      state.pendingApprovals = runId === "demo" && getDemoPendingApprovals
+      const approvals = runId === "demo" && getDemoPendingApprovals
         ? await getDemoPendingApprovals()
         : await listPendingApprovals();
+      state.pendingApprovals = _filterApprovalsForRun(approvals, runId);
       state.pendingStatus = "success";
       emit();
     } catch (err) {
@@ -55,6 +56,18 @@ export function createTimelineController({
       state.pendingError = err?.message ?? "Unknown error";
       emit();
     }
+  }
+
+  function _filterApprovalsForRun(approvals, currentRunId) {
+    if (!Array.isArray(approvals)) return [];
+    if (currentRunId === "demo") return approvals;
+    return approvals.filter((item) => {
+      if (!item || typeof item !== "object") return false;
+      if (!("run_id" in item)) return true;
+      const run = item.run_id;
+      if (typeof run !== "string") return true;
+      return run.trim() === "" || run === currentRunId;
+    });
   }
 
   async function submitApprovalDecision(eventId, decision, context = {}) {

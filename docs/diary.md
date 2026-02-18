@@ -8,6 +8,84 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #49 follow-up — real bot workflow contract (MCP + HTTP)
+
+### Summary
+
+Delivered the real bot workflow contract for Issue #49 using `MCP + HTTP`
+without adding a simulation harness:
+
+- bot pause/wait/resume semantics are documented as normative.
+- explicit approval registration remains required (`POST /v1/approvals/requests`).
+- real bot polling path is documented:
+  `GET /v1/approvals/decisions/{decision_id}`.
+- added operator-facing real workflow artifact:
+  `docs/artifacts/issue-49/openclaw_real_workflow.md`.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_issue47_end_to_end_api.py`
+- `./.venv/bin/pytest -q tests/test_mcp_stdio_server.py tests/test_mcp_remote_server.py`
+- `./.venv/bin/pytest -q tests/test_issue49_bot_workflow_docs.py`
+- `cd apps/web && node --test controller/timeline_controller.test.js`
+
+### Key Findings
+
+- Real bot workflow can operate with current NightLedger MVP primitives.
+- Polling is the intentional v1 decision signal mechanism; push notification
+  remains future scope.
+
+## 🗓️ 2026-02-18: Issue #49 — deterministic purchase enforcement demo packaging (5-Round cycle)
+
+### Summary
+
+Implemented issue `#49` as additive demo packaging while preserving existing
+Issue #54 triage flow:
+
+- Added sub-issue breakdown artifact:
+  `docs/artifacts/issue-49/sub_issues.md`.
+- Added one-command deterministic purchase proof script:
+  `tasks/smoke_purchase_enforcement_demo.sh`.
+- Added purchase demo sections to root docs:
+  - `README.md`
+  - `docs/DEMO_SCRIPT.md`
+  - `docs/API_TESTING.md`
+- Added verification artifact:
+  `docs/artifacts/issue-49/purchase_enforcement_verification.md`.
+- Added post-implementation gap assessment:
+  `docs/artifacts/issue-49/gap_assessment.md`.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+1. **Round 1 — Docs-lock baseline**
+   - Added failing tests for issue-49 artifact existence and README reference.
+   - Added `docs/artifacts/issue-49/sub_issues.md` and README command link.
+2. **Round 2 — Script contract lock**
+   - Added failing tests for smoke script step coverage and deterministic output.
+   - Implemented executable `tasks/smoke_purchase_enforcement_demo.sh`.
+3. **Round 3 — Demo guide integration**
+   - Added failing tests for Issue #49 command path in `docs/DEMO_SCRIPT.md`.
+   - Added additive purchase section + evidence checklist.
+4. **Round 4 — Verification artifact**
+   - Added failing tests for committed verification artifact content.
+   - Added `docs/artifacts/issue-49/purchase_enforcement_verification.md`.
+5. **Round 5 — Closure and assessment**
+   - Added failing tests for gap assessment, API testing linkage, and diary
+     evidence.
+   - Added `docs/artifacts/issue-49/gap_assessment.md` and updated docs.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_issue49_demo_packaging_docs.py`
+- `./.venv/bin/pytest -q`
+- `cd apps/web && node --test model/*.test.js controller/*.test.js view/*.test.js`
+
+### Key Findings
+
+- Core runtime enforcement logic already existed; #49 work was primarily
+  deterministic demo packaging and operator-proof artifacting.
+- #49 scope is now separated cleanly from #62 parent cleanup items.
+
 ## 🗓️ 2026-02-18: Issue #76 — adoption-ready bootstrap and contract versioning (5-Round cycle)
 
 ### Summary

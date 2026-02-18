@@ -280,3 +280,26 @@ test("emits failure decision log when approval request fails", async () => {
     },
   ]);
 });
+
+test("filters live pending approvals to current runId", async () => {
+  const controller = createTimelineController({
+    runId: "run-live-target",
+    getDemoEvents: async () => [],
+    getJournalEvents: async () => [],
+    listPendingApprovals: async () => [
+      { event_id: "evt-1", run_id: "run-live-target", title: "Target approval" },
+      { event_id: "evt-2", run_id: "run-other", title: "Other run approval" },
+      { event_id: "evt-3", title: "Legacy approval without run_id" },
+    ],
+    resolveApproval: async () => ({ ok: true }),
+    onState: () => {},
+  });
+
+  await controller.loadPendingApprovals();
+
+  assert.equal(controller.state.pendingApprovals.length, 2);
+  assert.deepEqual(
+    controller.state.pendingApprovals.map((item) => item.event_id),
+    ["evt-1", "evt-3"]
+  );
+});

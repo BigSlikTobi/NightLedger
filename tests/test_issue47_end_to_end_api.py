@@ -132,3 +132,103 @@ def test_issue47_requires_approval_path_blocks_then_allows_post_approval(monkeyp
     )
     assert execute.status_code == 200
     assert execute.json()["decision_id"] == decision_id
+
+
+def test_issue47_requires_explicit_registration_before_decision_state_exists() -> None:
+    authorize = client.post(
+        "/v1/mcp/authorize_action",
+        json=_authorize_payload(500, "req_issue47_registration_required"),
+    )
+    assert authorize.status_code == 200
+    decision_id = authorize.json()["decision_id"]
+
+    unresolved = client.get(f"/v1/approvals/decisions/{decision_id}")
+    assert unresolved.status_code == 404
+    assert unresolved.json()["error"]["code"] == "APPROVAL_NOT_FOUND"
+
+    blocked_resolve = client.post(
+        f"/v1/approvals/decisions/{decision_id}",
+        json={"decision": "approved", "approver_id": "human_reviewer"},
+    )
+    assert blocked_resolve.status_code == 409
+    assert blocked_resolve.json()["error"]["code"] == "NO_PENDING_APPROVAL"
+
+
+def test_issue47_decision_polling_drives_resume_for_approved_and_rejected() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    approve_authorize = client.post(
+        "/v1/mcp/authorize_action",
+        json=_authorize_payload(500, "req_issue47_poll_approved"),
+    )
+    approve_decision_id = approve_authorize.json()["decision_id"]
+    register_approved = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": approve_decision_id,
+            "run_id": "run_issue47_poll_approved",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert register_approved.status_code == 200
+
+    pending_state = client.get(f"/v1/approvals/decisions/{approve_decision_id}")
+    assert pending_state.status_code == 200
+    assert pending_state.json()["status"] == "pending"
+
+    approve = client.post(
+        f"/v1/approvals/decisions/{approve_decision_id}",
+        json={"decision": "approved", "approver_id": "human_reviewer"},
+    )
+    assert approve.status_code == 200
+
+    approved_state = client.get(f"/v1/approvals/decisions/{approve_decision_id}")
+    assert approved_state.status_code == 200
+    assert approved_state.json()["status"] == "approved"
+
+    approved_mint = client.post(
+        f"/v1/approvals/decisions/{approve_decision_id}/execution-token",
+        json={"amount": 500, "currency": "EUR", "merchant": "ACME GmbH"},
+    )
+    assert approved_mint.status_code == 200
+
+    reject_authorize = client.post(
+        "/v1/mcp/authorize_action",
+        json=_authorize_payload(500, "req_issue47_poll_rejected"),
+    )
+    reject_decision_id = reject_authorize.json()["decision_id"]
+    register_rejected = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": reject_decision_id,
+            "run_id": "run_issue47_poll_rejected",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert register_rejected.status_code == 200
+
+    reject = client.post(
+        f"/v1/approvals/decisions/{reject_decision_id}",
+        json={"decision": "rejected", "approver_id": "human_reviewer"},
+    )
+    assert reject.status_code == 200
+
+    rejected_state = client.get(f"/v1/approvals/decisions/{reject_decision_id}")
+    assert rejected_state.status_code == 200
+    assert rejected_state.json()["status"] == "rejected"
+
+    rejected_mint = client.post(
+        f"/v1/approvals/decisions/{reject_decision_id}/execution-token",
+        json={"amount": 500, "currency": "EUR", "merchant": "ACME GmbH"},
+    )
+    assert rejected_mint.status_code == 409
+    assert rejected_mint.json()["error"]["code"] == "EXECUTION_DECISION_NOT_APPROVED"

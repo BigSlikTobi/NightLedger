@@ -24,6 +24,7 @@ Use one primary document per concern to avoid contract drift:
 | `spec/MVP/roadmap.md` | Current execution roadmap |
 | `docs/API_TESTING.md` | Local API smoke flows |
 | `docs/DEMO_SCRIPT.md` | Reproducible demo handoff path |
+| `docs/SHOWCASE_E2E_SETUP.md` | Non-technical end-to-end showcase operator playbook |
 | `docs/REPO_HYGIENE.md` | Branch/artifact hygiene policy and cleanup workflow |
 
 ## Quick Start (Fresh Clone)
@@ -83,6 +84,34 @@ bash tasks/reset_seed_triage_inbox_demo.sh
 
 This seeds a deterministic paused run (`run_triage_inbox_demo_1`) for approval
 and journal demo flows.
+
+## Deterministic purchase enforcement demo (Issue #49)
+
+Run the purchase proof path for `block -> approve -> execute`:
+
+```bash
+bash tasks/smoke_purchase_enforcement_demo.sh
+```
+
+## Real bot workflow (Issue #49 v1)
+
+This is the production-facing contract for a real bot integration using
+`MCP + HTTP`:
+
+1. Bot calls MCP `authorize_action`.
+2. If decision is `allow`, bot proceeds.
+3. If decision is `requires_approval`, bot pauses fail-closed.
+4. Bot explicitly registers pending approval:
+   `POST /v1/approvals/requests`.
+5. User approves/rejects in UI (`/view/?mode=live&runId=<run_id>&apiBase=...`).
+6. Bot polls `GET /v1/approvals/decisions/{decision_id}`.
+7. If approved, bot mints token:
+   `POST /v1/approvals/decisions/{decision_id}/execution-token`.
+8. Bot executes with token:
+   `POST /v1/executors/purchase.create`.
+
+No simulation is required for this flow. OpenClaw (or any independent bot)
+should implement these contract steps directly.
 
 ## MCP authorize_action (Issue #44 v1 contract)
 
