@@ -228,3 +228,24 @@ def test_issue47_round5_journal_projection_exposes_execution_receipt_metadata_fo
     assert execution["metadata"]["actor"] == "system"
     assert execution["event_type"] == "action"
     assert execution["payload_ref"]["path"].startswith(f"/v1/runs/{run_id}/events#")
+
+
+def test_issue48_round1_runtime_receipt_persists_decision_id_link(monkeypatch) -> None:
+    monkeypatch.setenv("NIGHTLEDGER_EXECUTION_TOKEN_SECRET", "issue48-round1-secret-material-32bytes!!")
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    run_id = "run_issue48_round1"
+    response = client.post(
+        "/v1/mcp/authorize_action",
+        json=_authorize_payload(run_id=run_id, amount=100, request_id="req_issue48_round1"),
+    )
+    assert response.status_code == 200
+    decision_id = response.json()["decision_id"]
+
+    events_response = client.get(f"/v1/runs/{run_id}/events")
+    assert events_response.status_code == 200
+    events = events_response.json()["events"]
+    decision_receipts = [event for event in events if event["payload"]["title"] == "authorize_action decision recorded"]
+    assert decision_receipts, events
+    assert decision_receipts[-1]["payload"]["approval"]["decision_id"] == decision_id

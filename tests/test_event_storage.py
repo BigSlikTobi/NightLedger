@@ -801,5 +801,71 @@ def test_api_docs_specify_run_id_min_length() -> None:
     )
 
 
+def test_issue48_round2_inmemory_store_persists_hash_chain_fields() -> None:
+    store = InMemoryAppendOnlyEventStore()
+
+    first_payload = valid_event_payload()
+    first_payload["id"] = "evt_issue48_round2_first"
+    first_payload["run_id"] = "run_issue48_round2_chain"
+    first_payload["timestamp"] = "2026-02-18T14:00:00Z"
+
+    second_payload = valid_event_payload()
+    second_payload["id"] = "evt_issue48_round2_second"
+    second_payload["run_id"] = "run_issue48_round2_chain"
+    second_payload["timestamp"] = "2026-02-18T14:00:01Z"
+
+    first = store.append(validate_event_payload(first_payload))
+    second = store.append(validate_event_payload(second_payload))
+
+    assert first.prev_hash is None
+    assert isinstance(first.hash, str) and first.hash
+    assert second.prev_hash == first.hash
+    assert isinstance(second.hash, str) and second.hash != first.hash
+
+
+def test_issue48_round2_inmemory_hash_chain_uses_append_order_not_timestamp_order() -> None:
+    store = InMemoryAppendOnlyEventStore()
+
+    first_payload = valid_event_payload()
+    first_payload["id"] = "evt_issue48_round2_append_first"
+    first_payload["run_id"] = "run_issue48_round2_append_order"
+    first_payload["timestamp"] = "2026-02-18T15:00:10Z"
+
+    second_payload = valid_event_payload()
+    second_payload["id"] = "evt_issue48_round2_append_second"
+    second_payload["run_id"] = "run_issue48_round2_append_order"
+    second_payload["timestamp"] = "2026-02-18T15:00:00Z"
+
+    first = store.append(validate_event_payload(first_payload))
+    second = store.append(validate_event_payload(second_payload))
+
+    assert second.prev_hash == first.hash
+    assert second.integrity_warning is True
+
+
+def test_issue48_round2_sqlite_store_persists_hash_chain_fields(tmp_path) -> None:
+    from nightledger_api.services.event_store import SQLiteAppendOnlyEventStore
+
+    db_path = tmp_path / "issue48_round2_events.db"
+    store = SQLiteAppendOnlyEventStore(path=str(db_path))
+
+    first_payload = valid_event_payload()
+    first_payload["id"] = "evt_issue48_round2_sqlite_first"
+    first_payload["run_id"] = "run_issue48_round2_sqlite"
+    first_payload["timestamp"] = "2026-02-18T16:00:00Z"
+
+    second_payload = valid_event_payload()
+    second_payload["id"] = "evt_issue48_round2_sqlite_second"
+    second_payload["run_id"] = "run_issue48_round2_sqlite"
+    second_payload["timestamp"] = "2026-02-18T16:00:01Z"
+
+    first = store.append(validate_event_payload(first_payload))
+    second = store.append(validate_event_payload(second_payload))
+
+    assert first.prev_hash is None
+    assert isinstance(first.hash, str) and first.hash
+    assert second.prev_hash == first.hash
+    assert isinstance(second.hash, str) and second.hash != first.hash
+
 
 
