@@ -92,6 +92,10 @@ class NoPendingApprovalError(Exception):
 
 
 class DuplicateApprovalError(Exception):
-    def __init__(self, event_id: str) -> None:
+    def __init__(self, event_id: str, *, detail_path: str = "event_id") -> None:
         self.event_id = event_id
-        super().__init__(f"Approval for event '{event_id}' has already been resolved")
+        self.detail_path = detail_path
+        if detail_path == "decision_id":
+            super().__init__(f"Approval for decision '{event_id}' has already been resolved")
+        else:
+            super().__init__(f"Approval for event '{event_id}' has already been resolved")

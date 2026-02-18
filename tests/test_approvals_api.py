@@ -756,3 +756,89 @@ def test_issue46_round4_query_unknown_decision_id_returns_not_found() -> None:
     body = response.json()
     assert body["error"]["code"] == "APPROVAL_NOT_FOUND"
     assert body["error"]["details"][0]["path"] == "decision_id"
+
+
+def test_issue46_round5_rejects_duplicate_pending_registration_by_decision_id() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    first = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round5_dup",
+            "run_id": "run_issue46_round5_dup",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round5_dup",
+            "run_id": "run_issue46_round5_dup",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert second.status_code == 409
+    assert second.json()["error"]["code"] == "DUPLICATE_APPROVAL"
+
+
+def test_issue46_round5_query_returns_resolved_state_after_decision_resolution() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    register_response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round5_query",
+            "run_id": "run_issue46_round5_query",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert register_response.status_code == 200
+    resolve_response = client.post(
+        "/v1/approvals/decisions/dec_issue46_round5_query",
+        json={"decision": "rejected", "approver_id": "human_reviewer"},
+    )
+    assert resolve_response.status_code == 200
+
+    query_response = client.get("/v1/approvals/decisions/dec_issue46_round5_query")
+    assert query_response.status_code == 200
+    body = query_response.json()
+    assert body["status"] == "rejected"
+    assert body["resolved_event_id"] is not None
+    assert body["resolved_by"] == "human_reviewer"
+    assert body["resolved_at"] is not None
+
+
+def test_issue46_round5_legacy_event_id_route_remains_supported() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    ingest(
+        build_event_payload(
+            event_id="evt_issue46_legacy_target",
+            run_id="run_issue46_legacy_target",
+            timestamp="2026-02-18T10:00:00Z",
+            event_type="approval_requested",
+            requires_approval=True,
+            approval_status="pending",
+            requested_by="agent",
+        )
+    )
+    response = client.post(
+        "/v1/approvals/evt_issue46_legacy_target",
+        json={"decision": "approved", "approver_id": "human_reviewer"},
+    )
+    assert response.status_code == 200
+    assert response.json()["target_event_id"] == "evt_issue46_legacy_target"

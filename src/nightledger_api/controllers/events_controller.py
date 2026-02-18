@@ -378,7 +378,7 @@ def register_approval_request(
             risk_level=payload.risk_level,
             reason=payload.reason,
         )
-    except (StorageReadError, StorageWriteError):
+    except (StorageReadError, StorageWriteError, DuplicateApprovalError):
         raise
     except Exception as exc:  # pragma: no cover - defensive wrapper
         raise StorageReadError("storage backend read failed") from exc

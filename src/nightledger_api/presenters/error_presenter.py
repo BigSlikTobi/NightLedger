@@ -199,7 +199,7 @@ def present_duplicate_approval_error(exc: DuplicateApprovalError) -> dict[str, A
             "rule_ids": ["RULE-GATE-003"],
             "details": [
                 {
-                    "path": "event_id",
+                    "path": exc.detail_path,
                     "message": str(exc),
                     "type": "state_conflict",
                     "code": "DUPLICATE_APPROVAL",

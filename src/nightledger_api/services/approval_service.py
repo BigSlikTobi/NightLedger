@@ -73,6 +73,14 @@ def register_pending_approval_request(
     risk_level: Literal["low", "medium", "high"],
     reason: str | None,
 ) -> dict[str, Any]:
+    existing_decision_events = [
+        event
+        for event in store.list_all()
+        if event.payload.get("approval", {}).get("decision_id") == decision_id
+    ]
+    if existing_decision_events:
+        raise DuplicateApprovalError(event_id=decision_id, detail_path="decision_id")
+
     now = datetime.now(timezone.utc)
     run_events = store.list_by_run_id(run_id)
     if run_events:
