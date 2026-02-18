@@ -833,6 +833,39 @@ Response (v0 draft):
 }
 ```
 
+## GET /v1/approvals/decisions/{decision_id}/audit-export
+
+Export tamper-evident append-only receipts for one `decision_id`.
+
+Behavior:
+
+- `200 OK` with decision-scoped audit artifact.
+- `404 Not Found` when `decision_id` does not exist.
+- Export includes hash-chain integrity fields (`prev_hash`, `hash`) for each
+  receipt in append order.
+
+Response (v0 draft):
+
+```json
+{
+  "decision_id": "dec_8b43f6748da8bb2d",
+  "run_id": "run_123",
+  "event_count": 3,
+  "events": [
+    {
+      "event_id": "evt_runtime_1",
+      "decision_id": "dec_8b43f6748da8bb2d",
+      "action_type": "decision",
+      "actor": "system",
+      "timestamp": "2026-02-18T12:00:00Z",
+      "reason": "decision_id=dec_8b43f6748da8bb2d state=allow reason_code=POLICY_ALLOW_WITHIN_THRESHOLD",
+      "prev_hash": null,
+      "hash": "sha256:..."
+    }
+  ]
+}
+```
+
 ## POST /v1/approvals/{event_id} (legacy compatibility)
 
 Resolve pending approval.

@@ -93,6 +93,17 @@ behavior. This rule catalog uses the same field names as
   - IF `title` or `details` is missing/empty
   - THEN reject with `MISSING_TIMELINE_FIELDS`
 
+### RULE-CORE-010: Tamper-Evident Hash Chain Integrity
+
+- Needs: stored event append order, `prev_hash`, `hash`
+- Rule:
+  - IF an event is appended to a run
+  - THEN storage must persist deterministic `prev_hash` (prior event hash in
+    append order, or `null` for first event)
+  - THEN storage must persist deterministic `hash` for the current event
+  - IF recomputed chain links do not match persisted fields
+  - THEN fail with `HASH_CHAIN_BROKEN`
+
 ## Risk Labeling
 
 ### RULE-RISK-001: Workflow Metadata Shape

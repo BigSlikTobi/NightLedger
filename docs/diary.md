@@ -8,6 +8,60 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #48 — tamper-evident audit receipts (5-Round cycle)
+
+### Summary
+
+Implemented issue `#48` audit integrity scope end-to-end:
+
+- Added deterministic per-run hash-chain metadata in append-only storage:
+  `prev_hash` + `hash`.
+- Added decision-scoped audit export endpoint:
+  `GET /v1/approvals/decisions/{decision_id}/audit-export`.
+- Hardened runtime receipts so `approval.decision_id` is persisted when
+  available, enabling full decision trace reconstruction.
+- Added closure artifacts:
+  `docs/artifacts/issue-48/sub_issues.md` and
+  `docs/artifacts/issue-48/gap_assessment.md`.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+1. **Round 1 — Contract + linkage baseline**
+   - Added failing docs-lock tests for #48 contracts and sub-issue artifact.
+   - Added failing runtime receipt linkage test for persisted
+     `approval.decision_id`.
+   - Implemented docs foundation and runtime receipt linkage fix.
+2. **Round 2 — Storage hash-chain persistence**
+   - Added failing tests for in-memory/sqlite `prev_hash` + `hash` behavior.
+   - Implemented deterministic hash-chain persistence across both backends.
+3. **Round 3 — Decision audit export API**
+   - Added failing tests for decision export success and unknown decision path.
+   - Implemented export service + endpoint wiring.
+4. **Round 4 — Tamper evidence enforcement**
+   - Added failing tamper test (payload mutated while stored hash unchanged).
+   - Implemented recomputed-hash verification and fail-loud
+     `HASH_CHAIN_BROKEN`.
+5. **Round 5 — Closure docs + gap assessment**
+   - Added failing tests for README audit flow and gap-assessment artifact.
+   - Implemented docs updates and post-implementation gap assessment.
+
+### Validation
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_issue48_audit_receipts_docs.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_event_storage.py -k issue48_round2`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_audit_export_api.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+
+### Key Findings
+
+- Issue `#48` acceptance criteria is now satisfied for append-only
+  tamper-evident receipts and decision-level exportability.
+- Export verification now detects chain-link mismatch and payload tampering in
+  audit traces.
+- Remaining open-issue scope stays clearly separated:
+  #49 (demo packaging), #75 (remote MCP transport), #76 (adoption/versioning),
+  #62 (cleanup parent).
+
 ## 🗓️ 2026-02-18: Issue #46 — decision_id approval flow v1 (5-Round cycle)
 
 ### Summary

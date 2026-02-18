@@ -20,6 +20,7 @@ from nightledger_api.services.authorize_action_service import (
     AuthorizeActionRequest,
     evaluate_authorize_action,
 )
+from nightledger_api.services.audit_export_service import export_decision_audit
 from nightledger_api.services.business_rules_service import validate_event_business_rules
 from nightledger_api.services.event_ingest_service import validate_event_payload
 from nightledger_api.services.event_store import (
@@ -590,6 +591,23 @@ def get_approval_by_decision_id(
         raise StorageReadError("storage backend read failed") from exc
 
 
+@router.get("/v1/approvals/decisions/{decision_id}/audit-export", status_code=status.HTTP_200_OK)
+def get_decision_audit_export(
+    decision_id: str,
+    store: EventStore = Depends(get_event_store),
+) -> dict[str, Any]:
+    try:
+        return export_decision_audit(store=store, decision_id=decision_id)
+    except (
+        StorageReadError,
+        ApprovalNotFoundError,
+        InconsistentRunStateError,
+    ):
+        raise
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise StorageReadError("storage backend read failed") from exc
+
+
 @router.post("/v1/executors/purchase.create", status_code=status.HTTP_200_OK)
 def execute_purchase_create(
     payload: PurchaseCreateExecutionRequest,
@@ -781,7 +799,7 @@ def _append_runtime_receipt(
         "requires_approval": False,
         "approval": {
             "status": "not_required",
-            "decision_id": None,
+            "decision_id": decision_id,
             "requested_by": None,
             "resolved_by": None,
             "resolved_at": None,

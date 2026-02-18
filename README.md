@@ -243,3 +243,21 @@ receipt events that are visible in:
 
 - `GET /v1/runs/{run_id}/events`
 - `GET /v1/runs/{run_id}/journal`
+
+## Audit Export Flow (Issue #48)
+
+NightLedger now exposes tamper-evident decision audit exports:
+
+- `GET /v1/approvals/decisions/{decision_id}/audit-export`
+
+Export payload includes deterministic integrity chain fields for every exported
+receipt:
+
+- `prev_hash`
+- `hash`
+
+Example:
+
+```bash
+curl -sS http://127.0.0.1:8001/v1/approvals/decisions/dec_123/audit-export
+```

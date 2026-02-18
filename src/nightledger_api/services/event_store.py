@@ -2,6 +2,7 @@ from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
+import hashlib
 import json
 import os
 import sqlite3
@@ -18,6 +19,8 @@ class StoredEvent:
     run_id: str
     payload: dict[str, Any]
     integrity_warning: bool = False
+    prev_hash: str | None = None
+    hash: str = ""
 
 
 class EventStore(Protocol):
@@ -50,6 +53,8 @@ class _StoredRecord:
     run_id: str
     payload: dict[str, Any]
     integrity_warning: bool = False
+    prev_hash: str | None = None
+    hash: str = ""
 
 
 class InMemoryAppendOnlyEventStore:
@@ -58,6 +63,7 @@ class InMemoryAppendOnlyEventStore:
         self._event_id_index: dict[str, set[str]] = defaultdict(set)
         self._run_records_index: dict[str, list[_StoredRecord]] = defaultdict(list)
         self._last_timestamp_by_run: dict[str, datetime] = {}
+        self._last_hash_by_run: dict[str, str] = {}
 
     def append(self, event: EventPayload) -> StoredEvent:
         # RULE-CORE-003: Duplicate Event Prevention (O(1) lookup)
@@ -76,17 +82,31 @@ class InMemoryAppendOnlyEventStore:
             # First event for this run
             self._last_timestamp_by_run[event.run_id] = event.timestamp
 
+        payload = event.model_dump(mode="json")
+        prev_hash = self._last_hash_by_run.get(event.run_id)
+        current_hash = _build_event_hash(
+            run_id=event.run_id,
+            event_id=event.id,
+            timestamp=event.timestamp.isoformat(),
+            payload=payload,
+            integrity_warning=integrity_warning,
+            prev_hash=prev_hash,
+        )
+
         self._sequence += 1
         record = _StoredRecord(
             sequence=self._sequence,
             id=event.id,
             timestamp=event.timestamp,
             run_id=event.run_id,
-            payload=event.model_dump(mode="json"),
+            payload=payload,
             integrity_warning=integrity_warning,
+            prev_hash=prev_hash,
+            hash=current_hash,
         )
         self._event_id_index[event.run_id].add(event.id)
         self._run_records_index[event.run_id].append(record)
+        self._last_hash_by_run[event.run_id] = current_hash
         return self._to_stored_event(record)
 
     def list_by_run_id(self, run_id: str) -> list[StoredEvent]:
@@ -111,6 +131,8 @@ class InMemoryAppendOnlyEventStore:
             run_id=record.run_id,
             payload=deepcopy(record.payload),
             integrity_warning=record.integrity_warning,
+            prev_hash=record.prev_hash,
+            hash=record.hash,
         )
 
 
@@ -126,7 +148,7 @@ class SQLiteAppendOnlyEventStore:
             conn.execute("PRAGMA synchronous=NORMAL")
             last_row = conn.execute(
                 """
-                SELECT timestamp
+                SELECT timestamp, hash
                 FROM events
                 WHERE run_id = ?
                 ORDER BY sequence DESC
@@ -134,23 +156,45 @@ class SQLiteAppendOnlyEventStore:
                 """,
                 (event.run_id,),
             ).fetchone()
+            prev_hash: str | None = None
             if last_row is not None:
                 last_timestamp = datetime.fromisoformat(str(last_row[0]))
                 if event.timestamp < last_timestamp:
                     integrity_warning = True
+                prev_hash = str(last_row[1]) if last_row[1] is not None else None
+
+            payload = event.model_dump(mode="json")
+            current_hash = _build_event_hash(
+                run_id=event.run_id,
+                event_id=event.id,
+                timestamp=event.timestamp.isoformat(),
+                payload=payload,
+                integrity_warning=integrity_warning,
+                prev_hash=prev_hash,
+            )
 
             try:
                 cursor = conn.execute(
                     """
-                    INSERT INTO events (run_id, event_id, timestamp, payload_json, integrity_warning)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO events (
+                        run_id,
+                        event_id,
+                        timestamp,
+                        payload_json,
+                        integrity_warning,
+                        prev_hash,
+                        hash
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         event.run_id,
                         event.id,
                         event.timestamp.isoformat(),
-                        json.dumps(event.model_dump(mode="json"), separators=(",", ":")),
+                        json.dumps(payload, separators=(",", ":")),
                         1 if integrity_warning else 0,
+                        prev_hash,
+                        current_hash,
                     ),
                 )
             except sqlite3.IntegrityError as exc:
@@ -158,7 +202,7 @@ class SQLiteAppendOnlyEventStore:
 
             row = conn.execute(
                 """
-                SELECT sequence, run_id, event_id, timestamp, payload_json, integrity_warning
+                SELECT sequence, run_id, event_id, timestamp, payload_json, integrity_warning, prev_hash, hash
                 FROM events
                 WHERE sequence = ?
                 """,
@@ -171,7 +215,7 @@ class SQLiteAppendOnlyEventStore:
         with sqlite3.connect(self._path) as conn:
             rows = conn.execute(
                 """
-                SELECT sequence, run_id, event_id, timestamp, payload_json, integrity_warning
+                SELECT sequence, run_id, event_id, timestamp, payload_json, integrity_warning, prev_hash, hash
                 FROM events
                 WHERE run_id = ?
                 ORDER BY timestamp ASC, sequence ASC
@@ -184,7 +228,7 @@ class SQLiteAppendOnlyEventStore:
         with sqlite3.connect(self._path) as conn:
             rows = conn.execute(
                 """
-                SELECT sequence, run_id, event_id, timestamp, payload_json, integrity_warning
+                SELECT sequence, run_id, event_id, timestamp, payload_json, integrity_warning, prev_hash, hash
                 FROM events
                 ORDER BY timestamp ASC, sequence ASC
                 """
@@ -205,10 +249,20 @@ class SQLiteAppendOnlyEventStore:
                     timestamp TEXT NOT NULL,
                     payload_json TEXT NOT NULL,
                     integrity_warning INTEGER NOT NULL DEFAULT 0,
+                    prev_hash TEXT,
+                    hash TEXT,
                     UNIQUE(run_id, event_id)
                 )
                 """
             )
+            columns = {
+                str(row[1]): row
+                for row in conn.execute("PRAGMA table_info(events)").fetchall()
+            }
+            if "prev_hash" not in columns:
+                conn.execute("ALTER TABLE events ADD COLUMN prev_hash TEXT")
+            if "hash" not in columns:
+                conn.execute("ALTER TABLE events ADD COLUMN hash TEXT")
             conn.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_events_run_time
@@ -218,12 +272,38 @@ class SQLiteAppendOnlyEventStore:
             conn.commit()
 
     def _to_stored_event(self, row: tuple[Any, ...]) -> StoredEvent:
-        _sequence, run_id, event_id, timestamp, payload_json, integrity_warning = row
+        _sequence, run_id, event_id, timestamp, payload_json, integrity_warning, prev_hash, current_hash = row
         return StoredEvent(
             id=str(event_id),
             timestamp=datetime.fromisoformat(str(timestamp)),
             run_id=str(run_id),
             payload=deepcopy(json.loads(str(payload_json))),
             integrity_warning=bool(integrity_warning),
+            prev_hash=str(prev_hash) if prev_hash is not None else None,
+            hash=str(current_hash) if current_hash is not None else "",
         )
 
+
+def _build_event_hash(
+    *,
+    run_id: str,
+    event_id: str,
+    timestamp: str,
+    payload: dict[str, Any],
+    integrity_warning: bool,
+    prev_hash: str | None,
+) -> str:
+    canonical = json.dumps(
+        {
+            "run_id": run_id,
+            "event_id": event_id,
+            "timestamp": timestamp,
+            "payload": payload,
+            "integrity_warning": integrity_warning,
+            "prev_hash": prev_hash,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"

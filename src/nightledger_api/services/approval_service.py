@@ -79,9 +79,14 @@ def register_pending_approval_request(
         for event in store.list_all()
         if event.payload.get("approval", {}).get("decision_id") == decision_id
     ]
-    if existing_decision_events:
+    lifecycle_events = [
+        event
+        for event in existing_decision_events
+        if _is_pending_signal(event) or _is_resolution_signal(event)
+    ]
+    if lifecycle_events:
         latest_reason = "resolved"
-        for event in existing_decision_events:
+        for event in lifecycle_events:
             if _is_pending_signal(event):
                 latest_reason = "pending"
             elif _is_resolution_signal(event):
