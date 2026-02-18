@@ -1038,3 +1038,55 @@ Behavior:
 - Intended for polling/UI refresh; payload is stable and deterministic.
 - If any run contains an inconsistent approval timeline, endpoint returns `409`
   / `INCONSISTENT_RUN_STATE` (fail-loud semantics).
+
+## POST /v1/approvals/decisions/{decision_id}/execution-token
+
+Mint a short-lived execution token for `purchase.create`.
+
+Behavior:
+
+- `200 OK` when approval decision status is `approved`.
+- `404 Not Found` when `decision_id` does not exist.
+- `409 Conflict` with `EXECUTION_DECISION_NOT_APPROVED` when decision is
+  `pending` or `rejected`.
+
+Success response:
+
+```json
+{
+  "decision_id": "dec_...",
+  "action": "purchase.create",
+  "execution_token": "<signed-token>",
+  "expires_at": "2026-02-18T12:05:00Z"
+}
+```
+
+## POST /v1/executors/purchase.create
+
+Protected runtime executor for purchase execution.
+
+Authorization:
+
+- Required header: `Authorization: Bearer <execution_token>`.
+
+Behavior:
+
+- `200 OK` with execution receipt when token is valid and unused.
+- `403 Forbidden` for token auth failures:
+  - `EXECUTION_TOKEN_MISSING`
+  - `EXECUTION_TOKEN_INVALID`
+  - `EXECUTION_TOKEN_EXPIRED`
+  - `EXECUTION_TOKEN_REPLAYED`
+  - `EXECUTION_ACTION_MISMATCH`
+
+Success response:
+
+```json
+{
+  "status": "executed",
+  "action": "purchase.create",
+  "decision_id": "dec_...",
+  "execution_id": "exec_...",
+  "executed_at": "2026-02-18T12:01:00Z"
+}
+```

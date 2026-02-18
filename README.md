@@ -100,7 +100,7 @@ curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
 ```
 
 ```json
-{"decision_id":"dec_...","state":"allow","reason_code":"POLICY_ALLOW_WITHIN_THRESHOLD"}
+{"decision_id":"dec_...","state":"allow","reason_code":"POLICY_ALLOW_WITHIN_THRESHOLD","execution_token":"<signed-token>","execution_token_expires_at":"2026-02-18T12:05:00Z"}
 ```
 
 Requires approval response (`amount` above threshold):
@@ -207,3 +207,16 @@ Fail-closed behavior:
 - Invalid/tampered token -> blocked.
 - Expired token -> blocked.
 - Replayed token -> blocked.
+
+Token mint and execution examples:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/approvals/decisions/dec_123/execution-token
+```
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/executors/purchase.create \
+  -H "Authorization: Bearer <signed-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"amount":100,"currency":"EUR","merchant":"ACME GmbH"}'
+```

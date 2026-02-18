@@ -1910,3 +1910,57 @@ see traceability, approval context, and evidence details directly in the UI.
 - **Validation evidence:**
   - `cd apps/web && node --test model/*.test.js controller/*.test.js view/*.test.js`
   - `./.venv/bin/pytest -q`
+
+---
+
+## 🗓️ 2026-02-18: Issue #47 — Token-Gated Purchase Executor Enforcement
+
+### Goal
+
+Implement runtime enforcement so `purchase.create` cannot execute without a
+valid NightLedger execution token, with fail-closed behavior for missing,
+invalid, expired, tampered, and replayed tokens.
+
+### 5-Round TDD Execution Summary
+
+1. **Round 1 (docs foundation):** Added doc-lock tests and updated
+   `spec/API.md`, `README.md`, and
+   `docs/artifacts/issue-47/sub_issues.md`.
+2. **Round 2 (token service):** Added HMAC token mint/verify service with
+   expiry and action binding checks.
+3. **Round 3 (executor boundary):** Added
+   `POST /v1/executors/purchase.create` with structured enforcement errors.
+4. **Round 4 (integration + replay):** Added token issuance on
+   `allow`, added
+   `POST /v1/approvals/decisions/{decision_id}/execution-token`, and enforced
+   single-use replay rejection.
+5. **Round 5 (final audit):** Added end-to-end acceptance tests and closure
+   artifacts including post-implementation gap assessment.
+
+### Shipped Behavior
+
+- `authorize_action` returns `execution_token` for `allow` decisions.
+- Approved decisions can mint execution token by decision id.
+- Protected executor requires `Authorization: Bearer <execution_token>`.
+- Structured hard-fail codes:
+  - `EXECUTION_TOKEN_MISSING`
+  - `EXECUTION_TOKEN_INVALID`
+  - `EXECUTION_TOKEN_EXPIRED`
+  - `EXECUTION_TOKEN_REPLAYED`
+  - `EXECUTION_ACTION_MISMATCH`
+  - `EXECUTION_DECISION_NOT_APPROVED`
+
+### Validation Evidence
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_issue47_executor_enforcement_docs.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_execution_token_service.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_purchase_executor_api.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_execution_token_integration_api.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_issue47_end_to_end_api.py tests/test_issue47_enforcement_closure_docs.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+
+### Findings
+
+- Issue #47 is closed at runtime enforcement boundary level.
+- Remaining gaps are explicitly documented in
+  `docs/artifacts/issue-47/gap_assessment.md` for #48/#49/#75/#76.
