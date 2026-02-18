@@ -149,6 +149,7 @@ def test_mcp_tools_call_returns_requires_approval_when_above_threshold() -> None
     decision = result["structuredContent"]
     assert decision["state"] == "requires_approval"
     assert decision["reason_code"] == "AMOUNT_ABOVE_THRESHOLD"
+    assert "execution_token" not in decision
 
 
 def test_mcp_tools_call_returns_structured_validation_error_for_missing_amount() -> None:

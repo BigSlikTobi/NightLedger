@@ -102,6 +102,64 @@ Expected output:
 - `status: "completed"`
 - `pending_approval: null`
 
+## Purchase Enforcement Command Path (Issue #49)
+
+This additive path proves the purchase flow
+`block -> approve -> execute` with deterministic operator output.
+
+### 0) Start API in a persistent terminal session
+
+```bash
+PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --reload --port 8001
+```
+
+### 1) Run one-command purchase enforcement proof
+
+```bash
+AUTO_START=0 bash tasks/smoke_purchase_enforcement_demo.sh
+```
+
+Expected output includes these deterministic proof lines:
+- `STEP 1 PASS: authorize_action returned requires_approval for 500 EUR`
+- `STEP 2 PASS: purchase executor blocked without token`
+- `STEP 3 PASS: execution token mint blocked before approval`
+- `STEP 4 PASS: decision approved by human reviewer`
+- `STEP 5 PASS: execution token minted after approval`
+- `STEP 6 PASS: purchase executor succeeded with valid token`
+- `purchase-enforcement demo: PASS`
+
+## Purchase Enforcement Evidence Checklist (Issue #49)
+
+| Step | Endpoint/Action | Receipt evidence to show |
+| --- | --- | --- |
+| 1 | `POST /v1/mcp/authorize_action` | response has `state: requires_approval`, `reason_code: AMOUNT_ABOVE_THRESHOLD`, deterministic `decision_id` |
+| 2 | `POST /v1/executors/purchase.create` (no token) | blocked with `403 EXECUTION_TOKEN_MISSING` |
+| 3 | `POST /v1/approvals/requests` then `POST /v1/approvals/decisions/{decision_id}/execution-token` | pending decision token mint blocked with `409 EXECUTION_DECISION_NOT_APPROVED` |
+| 4 | `POST /v1/approvals/decisions/{decision_id}` | approval resolution returns `status: resolved`, `decision: approved` |
+| 5 | `POST /v1/approvals/decisions/{decision_id}/execution-token` | token minted after approval (`execution_token` present) |
+| 6 | `POST /v1/executors/purchase.create` (valid token) | executor succeeded with valid token and returns `status: executed` |
+
+## Real Bot Workflow (Issue #49 v1)
+
+This section is for a real bot integration (no simulation):
+
+1. Bot calls MCP `authorize_action`.
+2. If `allow`, bot proceeds.
+3. If `requires_approval`, bot pauses.
+4. Bot posts `POST /v1/approvals/requests`.
+5. User approves/rejects in UI.
+6. Bot polls `GET /v1/approvals/decisions/{decision_id}`.
+7. Bot resumes only after approved state, then mints token and executes.
+
+UI step:
+
+- user approves/rejects in UI at:
+  `http://localhost:3000/view/?mode=live&runId=<run_id>&apiBase=http://127.0.0.1:8001`
+
+Bot polling step:
+
+- bot polls GET /v1/approvals/decisions/{decision_id}
+
 ## Troubleshooting
 
 What to check when demo flow fails:

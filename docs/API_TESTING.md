@@ -97,6 +97,58 @@ Expected:
 - failure detail message should be:
   `triage_inbox orchestration append failed`
 
+## Purchase enforcement smoke flow (Issue #49)
+
+Run the one-command deterministic purchase flow:
+
+```bash
+bash tasks/smoke_purchase_enforcement_demo.sh
+```
+
+Or run against an already running API:
+
+```bash
+AUTO_START=0 BASE_URL=http://127.0.0.1:8001 bash tasks/smoke_purchase_enforcement_demo.sh
+```
+
+Expected proof path:
+
+- `block -> approve -> execute`
+- `authorize_action` returns `requires_approval` for `500 EUR`
+- direct executor call without token is blocked
+- pre-approval execution token mint is blocked
+- approval resolution unlocks token mint
+- executor succeeds with valid token
+
+## Real bot workflow (Issue #49 v1)
+
+Use this flow for an independent real bot (for example OpenClaw), not a
+simulation harness:
+
+1. Bot calls MCP `authorize_action` (`amount=500`).
+2. Bot receives `requires_approval` and pauses fail-closed.
+3. Bot calls `POST /v1/approvals/requests`.
+4. User approves/rejects in UI.
+5. Bot polls `GET /v1/approvals/decisions/{decision_id}` until terminal state.
+6. If approved, bot mints token and executes.
+
+Minimal request sequence:
+
+```bash
+# 1) authorize
+curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
+  -H "Content-Type: application/json" \
+  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"openclaw_req_1","run_id":"run_openclaw_req_1","amount":500,"currency":"EUR","merchant":"ACME GmbH"}}'
+
+# 2) explicit approval registration
+curl -sS -X POST http://127.0.0.1:8001/v1/approvals/requests \
+  -H "Content-Type: application/json" \
+  -d '{"decision_id":"<decision_id>","run_id":"run_openclaw_req_1","requested_by":"openclaw","title":"Approval required","details":"Purchase amount exceeds threshold","risk_level":"high","reason":"Above threshold"}'
+
+# 3) polling
+curl -sS http://127.0.0.1:8001/v1/approvals/decisions/<decision_id>
+```
+
 ### 3) Verify terminal completion and receipts
 
 ```bash
