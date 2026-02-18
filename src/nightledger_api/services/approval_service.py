@@ -166,6 +166,41 @@ def resolve_pending_approval(
     raise NoPendingApprovalError(event_id=event_id)
 
 
+def resolve_pending_approval_by_decision_id(
+    *,
+    store: EventStore,
+    decision_id: str,
+    decision: ApprovalDecision,
+    approver_id: str,
+    reason: str | None,
+) -> dict[str, Any]:
+    all_events = store.list_all()
+    decision_events = [
+        event
+        for event in all_events
+        if event.payload.get("approval", {}).get("decision_id") == decision_id
+    ]
+    if not decision_events:
+        raise ApprovalNotFoundError(event_id=decision_id)
+
+    pending_events = [event for event in decision_events if _is_pending_signal(event)]
+    if len(pending_events) > 1:
+        raise AmbiguousEventIdError(event_id=decision_id)
+    if not pending_events:
+        raise NoPendingApprovalError(event_id=decision_id)
+
+    target_event = pending_events[0]
+    result = resolve_pending_approval(
+        store=store,
+        event_id=target_event.id,
+        decision=decision,
+        approver_id=approver_id,
+        reason=reason,
+    )
+    result["decision_id"] = decision_id
+    return result
+
+
 def _append_resolution_event(
     *,
     store: EventStore,
@@ -204,6 +239,7 @@ def _append_resolution_event(
         "requires_approval": True,
         "approval": {
             "status": decision,
+            "decision_id": approval_data.get("decision_id"),
             "requested_by": approval_data.get("requested_by"),
             "resolved_by": approver_id,
             "resolved_at": resolved_at,

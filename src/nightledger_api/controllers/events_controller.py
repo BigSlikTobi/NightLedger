@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from nightledger_api.services.approval_service import (
     list_pending_approvals,
     register_pending_approval_request,
+    resolve_pending_approval_by_decision_id,
     resolve_pending_approval,
 )
 from nightledger_api.services.authorize_action_service import (
@@ -419,6 +420,52 @@ def resolve_approval(
     ) as exc:
         _log_approval_resolution_failed(
             event_id=event_id,
+            decision=payload.decision,
+            approver_id=payload.approver_id,
+            exc=exc,
+        )
+        raise
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise StorageReadError("storage backend read failed") from exc
+
+
+@router.post("/v1/approvals/decisions/{decision_id}", status_code=status.HTTP_200_OK)
+def resolve_approval_by_decision_id(
+    decision_id: str,
+    payload: ApprovalDecisionRequest,
+    store: EventStore = Depends(get_event_store),
+) -> dict[str, Any]:
+    _log_approval_resolution_requested(
+        event_id=decision_id,
+        decision=payload.decision,
+        approver_id=payload.approver_id,
+    )
+    try:
+        result = resolve_pending_approval_by_decision_id(
+            store=store,
+            decision_id=decision_id,
+            decision=payload.decision,
+            approver_id=payload.approver_id,
+            reason=payload.reason,
+        )
+        _log_approval_resolution_completed(
+            event_id=decision_id,
+            decision=payload.decision,
+            approver_id=payload.approver_id,
+            result=result,
+        )
+        return result
+    except (
+        StorageReadError,
+        StorageWriteError,
+        ApprovalNotFoundError,
+        AmbiguousEventIdError,
+        NoPendingApprovalError,
+        DuplicateApprovalError,
+        InconsistentRunStateError,
+    ) as exc:
+        _log_approval_resolution_failed(
+            event_id=decision_id,
             decision=payload.decision,
             approver_id=payload.approver_id,
             exc=exc,

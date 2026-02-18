@@ -653,3 +653,37 @@ def test_issue46_round1_registers_pending_approval_by_decision_id() -> None:
     assert body["run_id"] == "run_issue46_round1"
     assert body["approval_status"] == "pending"
     assert isinstance(body["event_id"], str) and body["event_id"]
+
+
+def test_issue46_round2_resolves_pending_approval_by_decision_id() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    register_response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round2",
+            "run_id": "run_issue46_round2",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert register_response.status_code == 200
+
+    resolve_response = client.post(
+        "/v1/approvals/decisions/dec_issue46_round2",
+        json={
+            "decision": "approved",
+            "approver_id": "human_reviewer",
+            "reason": "Approved for execution",
+        },
+    )
+
+    assert resolve_response.status_code == 200
+    body = resolve_response.json()
+    assert body["status"] == "resolved"
+    assert body["decision_id"] == "dec_issue46_round2"
+    assert body["decision"] == "approved"
+    assert body["run_id"] == "run_issue46_round2"
