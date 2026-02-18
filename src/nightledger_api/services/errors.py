@@ -114,3 +114,42 @@ class DuplicateApprovalError(Exception):
             super().__init__(f"Approval for event '{event_id}' already exists")
         else:
             super().__init__(f"Approval for event '{event_id}' has already been resolved")
+
+
+class ExecutionTokenError(Exception):
+    pass
+
+
+class ExecutionTokenMissingError(ExecutionTokenError):
+    def __init__(self) -> None:
+        super().__init__("Execution token is required")
+
+
+class ExecutionTokenInvalidError(ExecutionTokenError):
+    def __init__(self) -> None:
+        super().__init__("Execution token is invalid")
+
+
+class ExecutionTokenExpiredError(ExecutionTokenError):
+    def __init__(self) -> None:
+        super().__init__("Execution token is expired")
+
+
+class ExecutionTokenReplayedError(ExecutionTokenError):
+    def __init__(self) -> None:
+        super().__init__("Execution token has already been used")
+
+
+class ExecutionActionMismatchError(ExecutionTokenError):
+    def __init__(self, *, expected_action: str, token_action: str) -> None:
+        self.expected_action = expected_action
+        self.token_action = token_action
+        super().__init__(
+            f"Execution token action '{token_action}' does not match expected '{expected_action}'"
+        )
+
+
+class ExecutionDecisionNotApprovedError(ExecutionTokenError):
+    def __init__(self, *, decision_id: str) -> None:
+        self.decision_id = decision_id
+        super().__init__(f"Decision '{decision_id}' is not approved for execution")
