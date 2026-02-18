@@ -7,14 +7,22 @@ response envelopes, and endpoint-level behavior.
 
 Authorize an agent intent before an external side effect is executed.
 
-Behavior (issue #44):
+Behavior (issue #45 policy threshold v1):
 
 - Valid payload: `200 OK`
 - Invalid payload: `422 Unprocessable Entity`
-- Supported action in v1 transport contract: `purchase.create`
-- `context.transport_decision_hint` is optional and supports:
-  `allow|requires_approval|deny`
-- Decision state defaults to `allow` when hint is omitted
+- Supported action in v1 policy path: `purchase.create`
+- Policy inputs are required:
+  - `context.amount` (numeric)
+  - `context.currency` (`EUR`)
+- Configurable threshold (default): `100` EUR
+  - Environment override:
+    `NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR`
+- Decision rule:
+  - `amount <= threshold` => `state=allow`
+  - `amount > threshold` => `state=requires_approval`
+- `context.transport_decision_hint` remains accepted for request-shape
+  compatibility, but policy evaluation is authoritative for final decision
 - Every successful decision includes deterministic `decision_id`.
 
 Request payload:
@@ -26,6 +34,8 @@ Request payload:
   },
   "context": {
     "request_id": "req_123",
+    "amount": 101,
+    "currency": "EUR",
     "transport_decision_hint": "requires_approval"
   }
 }
@@ -56,6 +66,8 @@ Tool arguments:
   },
   "context": {
     "request_id": "req_123",
+    "amount": 100,
+    "currency": "EUR",
     "transport_decision_hint": "allow"
   }
 }
@@ -72,13 +84,13 @@ Tool result (`tools/call`):
 
 Success responses:
 
-`allow` (default when hint is omitted):
+`allow` (policy decision when amount is within threshold):
 
 ```json
 {
   "decision_id": "dec_1d51e326dbd1e7f0",
   "state": "allow",
-  "reason_code": "TRANSPORT_CONTRACT_ACCEPTED"
+  "reason_code": "POLICY_ALLOW_WITHIN_THRESHOLD"
 }
 ```
 
@@ -88,17 +100,7 @@ Success responses:
 {
   "decision_id": "dec_8b43f6748da8bb2d",
   "state": "requires_approval",
-  "reason_code": "TRANSPORT_REQUIRES_APPROVAL"
-}
-```
-
-`deny`:
-
-```json
-{
-  "decision_id": "dec_2b57476a7dbf302d",
-  "state": "deny",
-  "reason_code": "TRANSPORT_DENIED"
+  "reason_code": "AMOUNT_ABOVE_THRESHOLD"
 }
 ```
 

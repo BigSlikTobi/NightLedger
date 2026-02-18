@@ -81,9 +81,14 @@ def test_mcp_tools_list_exposes_authorize_action_contract() -> None:
     tool = result["tools"][0]
     assert tool["name"] == "authorize_action"
     assert tool["inputSchema"]["type"] == "object"
+    context_schema = tool["inputSchema"]["properties"]["context"]
+    assert "amount" in context_schema["properties"]
+    assert "currency" in context_schema["properties"]
+    assert "amount" in context_schema["required"]
+    assert "currency" in context_schema["required"]
 
 
-def test_mcp_tools_call_returns_structured_authorize_action_decision() -> None:
+def test_mcp_tools_call_returns_allow_when_amount_is_at_threshold() -> None:
     server = MCPServer()
 
     response = server.handle_message(
@@ -95,7 +100,12 @@ def test_mcp_tools_call_returns_structured_authorize_action_decision() -> None:
                 "name": "authorize_action",
                 "arguments": {
                     "intent": {"action": "purchase.create"},
-                    "context": {"request_id": "req_1", "transport_decision_hint": "deny"},
+                    "context": {
+                        "request_id": "req_1",
+                        "amount": 100,
+                        "currency": "EUR",
+                        "transport_decision_hint": "deny",
+                    },
                 },
             },
         }
@@ -105,12 +115,12 @@ def test_mcp_tools_call_returns_structured_authorize_action_decision() -> None:
     result = response["result"]
     assert result.get("isError") is not True
     decision = result["structuredContent"]
-    assert decision["state"] == "deny"
-    assert decision["reason_code"] == "TRANSPORT_DENIED"
+    assert decision["state"] == "allow"
+    assert decision["reason_code"] == "POLICY_ALLOW_WITHIN_THRESHOLD"
     assert decision["decision_id"].startswith("dec_")
 
 
-def test_mcp_tools_call_returns_structured_validation_error_for_invalid_action() -> None:
+def test_mcp_tools_call_returns_requires_approval_when_above_threshold() -> None:
     server = MCPServer()
 
     response = server.handle_message(
@@ -121,8 +131,68 @@ def test_mcp_tools_call_returns_structured_validation_error_for_invalid_action()
             "params": {
                 "name": "authorize_action",
                 "arguments": {
+                    "intent": {"action": "purchase.create"},
+                    "context": {
+                        "request_id": "req_2",
+                        "amount": 101,
+                        "currency": "EUR",
+                        "transport_decision_hint": "allow",
+                    },
+                },
+            },
+        }
+    )
+
+    assert response is not None
+    result = response["result"]
+    assert result.get("isError") is not True
+    decision = result["structuredContent"]
+    assert decision["state"] == "requires_approval"
+    assert decision["reason_code"] == "AMOUNT_ABOVE_THRESHOLD"
+
+
+def test_mcp_tools_call_returns_structured_validation_error_for_missing_amount() -> None:
+    server = MCPServer()
+
+    response = server.handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+                "name": "authorize_action",
+                "arguments": {
+                    "intent": {"action": "purchase.create"},
+                    "context": {"request_id": "req_missing", "currency": "EUR"},
+                },
+            },
+        }
+    )
+
+    assert response is not None
+    result = response["result"]
+    assert result["isError"] is True
+    error_payload = result["structuredContent"]
+    assert error_payload["error"]["code"] == "REQUEST_VALIDATION_ERROR"
+    detail_codes = {
+        detail["path"]: detail["code"] for detail in error_payload["error"]["details"]
+    }
+    assert detail_codes["context.amount"] == "MISSING_AMOUNT"
+
+
+def test_mcp_tools_call_returns_structured_validation_error_for_invalid_action() -> None:
+    server = MCPServer()
+
+    response = server.handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "tools/call",
+            "params": {
+                "name": "authorize_action",
+                "arguments": {
                     "intent": {"action": "transfer.create"},
-                    "context": {"request_id": "req_bad"},
+                    "context": {"request_id": "req_bad", "amount": 100, "currency": "EUR"},
                 },
             },
         }
@@ -164,7 +234,12 @@ def test_mcp_serve_streams_processes_framed_jsonrpc_messages() -> None:
             "name": "authorize_action",
             "arguments": {
                 "intent": {"action": "purchase.create"},
-                "context": {"request_id": "req_stream", "transport_decision_hint": "allow"},
+                "context": {
+                    "request_id": "req_stream",
+                    "amount": 100,
+                    "currency": "EUR",
+                    "transport_decision_hint": "requires_approval",
+                },
             },
         },
     }
@@ -209,7 +284,12 @@ def test_mcp_server_module_is_callable_over_stdio_transport() -> None:
             "name": "authorize_action",
             "arguments": {
                 "intent": {"action": "purchase.create"},
-                "context": {"request_id": "req_proc", "transport_decision_hint": "requires_approval"},
+                "context": {
+                    "request_id": "req_proc",
+                    "amount": 101,
+                    "currency": "EUR",
+                    "transport_decision_hint": "allow",
+                },
             },
         },
     }
@@ -231,7 +311,4 @@ def test_mcp_server_module_is_callable_over_stdio_transport() -> None:
     assert responses[0]["id"] == 11
     assert responses[0]["result"]["serverInfo"]["name"] == "nightledger"
     assert responses[1]["id"] == 12
-    assert (
-        responses[1]["result"]["structuredContent"]["state"]
-        == "requires_approval"
-    )
+    assert responses[1]["result"]["structuredContent"]["state"] == "requires_approval"

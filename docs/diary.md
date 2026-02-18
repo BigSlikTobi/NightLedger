@@ -8,6 +8,40 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #45 — sub-issue 1 policy threshold rule
+
+### Summary
+
+Documented issue `#45` into atomic sub-issues in
+`docs/artifacts/issue-45/sub_issues.md` and implemented only sub-issue 1.
+`authorize_action` now evaluates policy using required `context.amount` and
+`context.currency` inputs with a configurable EUR threshold
+(`NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR`, default `100`). Decisioning is
+policy-first: `amount <= threshold` returns `allow`, and `amount > threshold`
+returns `requires_approval` with `reason_code=AMOUNT_ABOVE_THRESHOLD`.
+`context.transport_decision_hint` remains accepted for request-shape
+compatibility but no longer drives final state. MCP tool schema, validation
+error-code mapping, and operator docs were updated to match.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_issue45_policy_threshold_docs.py tests/test_mcp_authorize_action_api.py tests/test_mcp_stdio_server.py`
+- `./.venv/bin/pytest -q tests/test_issue44_mcp_authorize_action_docs.py tests/test_issue45_policy_threshold_docs.py tests/test_mcp_authorize_action_api.py tests/test_mcp_stdio_server.py`
+- `./.venv/bin/pytest -q`
+- `node --test model/*.test.js controller/*.test.js view/*.test.js`
+
+### Key Findings / Gaps
+
+- Issue `#46` still expects decision_id-based approval flow, while runtime
+  approval endpoints are currently event_id-based.
+- Issue `#47` remains open: no token-gated purchase executor exists yet.
+- Issue `#48` remains open: append-only store has ordering + integrity warnings
+  but no tamper-evident hash chaining.
+- Issue `#49` remains open: demo script currently centers on triage_inbox flow,
+  not purchase `500 EUR -> approve -> execute`.
+- Backlog hygiene gap remains: #45/#46/#47/#48/#49 still carry
+  `status:blocked` labels despite #44 being closed.
+
 ## 🗓️ 2026-02-18: Issue #44 — sub-issue 4 MCP stdio server wrapper
 
 ### Summary

@@ -150,7 +150,10 @@ def _authorize_action_tool_definition() -> dict[str, Any]:
                 "context": {
                     "type": "object",
                     "additionalProperties": True,
+                    "required": ["amount", "currency"],
                     "properties": {
+                        "amount": {"type": "number"},
+                        "currency": {"type": "string", "enum": ["EUR"]},
                         "transport_decision_hint": {
                             "type": "string",
                             "enum": ["allow", "requires_approval", "deny"],

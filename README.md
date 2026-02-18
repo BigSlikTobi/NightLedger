@@ -81,40 +81,38 @@ Endpoint:
 POST /v1/mcp/authorize_action
 ```
 
-Allow response (default transport behavior):
+Policy rule (Issue #45 sub-issue 1):
+
+- `context.amount` and `context.currency` are required policy inputs.
+- Default threshold: `100` EUR (override with
+  `NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR`).
+- `amount <= threshold` => `allow`
+- `amount > threshold` => `requires_approval`
+- `transport_decision_hint` (`allow|requires_approval|deny`) is accepted for
+  backward compatibility but does not override policy outcome.
+
+Allow response (`amount` at threshold):
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_allow","transport_decision_hint":"allow"}}'
+  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_allow","amount":100,"currency":"EUR","transport_decision_hint":"deny"}}'
 ```
 
 ```json
-{"decision_id":"dec_...","state":"allow","reason_code":"TRANSPORT_CONTRACT_ACCEPTED"}
+{"decision_id":"dec_...","state":"allow","reason_code":"POLICY_ALLOW_WITHIN_THRESHOLD"}
 ```
 
-Requires approval response:
+Requires approval response (`amount` above threshold):
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_pause","transport_decision_hint":"requires_approval"}}'
+  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_pause","amount":101,"currency":"EUR","transport_decision_hint":"allow"}}'
 ```
 
 ```json
-{"decision_id":"dec_...","state":"requires_approval","reason_code":"TRANSPORT_REQUIRES_APPROVAL"}
-```
-
-Deny response:
-
-```bash
-curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
-  -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_deny","transport_decision_hint":"deny"}}'
-```
-
-```json
-{"decision_id":"dec_...","state":"deny","reason_code":"TRANSPORT_DENIED"}
+{"decision_id":"dec_...","state":"requires_approval","reason_code":"AMOUNT_ABOVE_THRESHOLD"}
 ```
 
 Invalid payload example (`intent.action` not supported):
@@ -122,7 +120,7 @@ Invalid payload example (`intent.action` not supported):
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"transfer.create"},"context":{"request_id":"req_invalid"}}'
+  -d '{"intent":{"action":"transfer.create"},"context":{"request_id":"req_invalid","amount":50,"currency":"EUR"}}'
 ```
 
 ```json
