@@ -278,6 +278,45 @@ Common risk-governance violation detail codes:
 
 Storage append error response (v0 draft):
 
+## POST /v1/approvals/decisions/{decision_id}/execution-token
+
+Mint an execution token for a previously approved `purchase.create` decision.
+
+Behavior:
+
+- `200 OK` when approval state is `approved` for `decision_id`.
+- `409 Conflict` when approval is `pending` or `rejected`
+  (`EXECUTION_DECISION_NOT_APPROVED`).
+- Response includes:
+  - `decision_id`
+  - `action` (`purchase.create`)
+  - `execution_token`
+  - `expires_at`
+
+## POST /v1/executors/purchase.create
+
+Protected runtime executor for `purchase.create`.
+
+Authorization:
+
+- Requires `Authorization: Bearer <execution_token>`.
+
+Verification rules:
+
+- Token must be cryptographically valid.
+- Token must be unexpired.
+- Token action binding must match `purchase.create`.
+- Token must be single-use; replay attempts fail.
+
+Error detail codes:
+
+- `EXECUTION_TOKEN_MISSING`
+- `EXECUTION_TOKEN_INVALID`
+- `EXECUTION_TOKEN_EXPIRED`
+- `EXECUTION_TOKEN_REPLAYED`
+- `EXECUTION_ACTION_MISMATCH`
+- `EXECUTION_DECISION_NOT_APPROVED`
+
 ```json
 {
   "error": {

@@ -187,3 +187,23 @@ New approval lifecycle endpoints:
 Legacy compatibility:
 
 - `POST /v1/approvals/{event_id}` remains available during migration.
+
+## Token-Gated Executor Flow (Issue #47)
+
+NightLedger enforces a hard runtime trust boundary for `purchase.create`.
+
+1. Policy decision:
+   `POST /v1/mcp/authorize_action` returns `allow` or `requires_approval`.
+2. Approval token minting:
+   `POST /v1/approvals/decisions/{decision_id}/execution-token` returns a short-lived
+   `execution_token` only when the decision is approved.
+3. Protected execution:
+   `POST /v1/executors/purchase.create` requires
+   `Authorization: Bearer <execution_token>`.
+
+Fail-closed behavior:
+
+- Missing token -> blocked.
+- Invalid/tampered token -> blocked.
+- Expired token -> blocked.
+- Replayed token -> blocked.
