@@ -44,6 +44,17 @@ cd apps/web
 node --test model/*.test.js controller/*.test.js view/*.test.js
 ```
 
+## Adoption v1 Quickstart (Issue #76)
+
+One command boots API + MCP runtime for local adoption flows:
+
+```bash
+bash tasks/bootstrap_nightledger_runtime.sh
+```
+
+This path is designed to prove setup -> connect -> call tool in under 10 minutes,
+including both API + MCP process startup.
+
 ## Quick Start (Local Runtime)
 
 ### 1) Start API (Terminal A)
@@ -222,6 +233,39 @@ Token auth options:
 
 Use these as templates for agent runtimes that support HTTP MCP servers.
 
+Claude Desktop (local stdio):
+
+```json
+{
+  "mcpServers": {
+    "nightledger-local": {
+      "command": "/Users/<your-user>/Projects/github/bigsliktobi/NightLedger/.venv/bin/python",
+      "args": [
+        "-m",
+        "nightledger_api.mcp_server"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/<your-user>/Projects/github/bigsliktobi/NightLedger/src"
+      }
+    }
+  }
+}
+```
+
+OpenHands/Cline-style (remote HTTP MCP):
+
+```json
+{
+  "name": "nightledger-remote",
+  "url": "http://<server-ip>:8002/v1/mcp/remote",
+  "headers": {
+    "Authorization": "Bearer <token>",
+    "Accept": "application/json",
+    "MCP-Protocol-Version": "2025-06-18"
+  }
+}
+```
+
 Generic remote MCP server config:
 
 ```json
@@ -271,6 +315,48 @@ OAuth metadata discovery endpoint (if your bot platform supports it):
 
 ```text
 http://<server-ip>:8002/.well-known/oauth-protected-resource
+```
+
+## Adoption v1 demo flow (under 10 minutes)
+
+1) Start both services:
+
+```bash
+bash tasks/bootstrap_nightledger_runtime.sh
+```
+
+2) Initialize MCP session:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8002/v1/mcp/remote \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer nightledger-local-dev-token" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"adoption-demo","version":"0.1.0"}}}'
+```
+
+3) List tools:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8002/v1/mcp/remote \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer nightledger-local-dev-token" \
+  -H "MCP-Session-Id: <session-id>" \
+  -H "MCP-Protocol-Version: 2025-06-18" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+```
+
+4) Call authorize_action:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8002/v1/mcp/remote \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer nightledger-local-dev-token" \
+  -H "MCP-Session-Id: <session-id>" \
+  -H "MCP-Protocol-Version: 2025-06-18" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"authorize_action","arguments":{"intent":{"action":"purchase.create"},"context":{"request_id":"req_demo_76","amount":101,"currency":"EUR"}}}}'
 ```
 
 ## Policy Threshold Operator Flow (Issue #45)

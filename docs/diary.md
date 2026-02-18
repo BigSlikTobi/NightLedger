@@ -8,6 +8,55 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #76 — adoption-ready bootstrap and contract versioning (5-Round cycle)
+
+### Summary
+
+Implemented issue `#76` adoption-ready packaging scope end-to-end:
+
+- Added one-command runtime bootstrap script:
+  `tasks/bootstrap_nightledger_runtime.sh` (API + MCP remote).
+- Added copy-paste client config templates for both local stdio and remote HTTP
+  MCP usage in `README.md`.
+- Added explicit `authorize_action` contract version marker:
+  - `contract_version` in runtime decisions
+  - `x-nightledger-contract.version` in MCP tool metadata
+- Documented compatibility/deprecation policy for `authorize_action` contract.
+- Added closure artifacts:
+  `docs/artifacts/issue-76/sub_issues.md` and
+  `docs/artifacts/issue-76/gap_assessment.md`.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+1. **Round 1 — Contract/docs baseline**
+   - Added failing docs tests for issue-76 quickstart + versioning baseline.
+   - Added sub-issue artifact and policy docs scaffolding.
+2. **Round 2 — Bootstrap command path**
+   - Added failing tests for bootstrap script presence and dry-run output.
+   - Implemented executable `bootstrap_nightledger_runtime.sh`.
+3. **Round 3 — Client config templates**
+   - Added failing tests for local stdio and remote client snippets.
+   - Added concrete config examples in README.
+4. **Round 4 — Version marker implementation**
+   - Added failing tests for `contract_version` and MCP metadata marker.
+   - Implemented shared contract version constant and output wiring.
+5. **Round 5 — Demo proof + closure**
+   - Added failing tests for under-10-minute demo section and closure artifacts.
+   - Added demo flow, gap assessment, and diary evidence.
+
+### Validation
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_issue76_adoption_docs.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_issue76_contract_versioning.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+
+### Key Findings
+
+- Issue `#76` now provides an adoption-ready interface surface with explicit
+  version marker discipline.
+- Remaining open scope stays separated in #49 (demo proof packaging) and #62
+  (cleanup parent closure).
+
 ## 🗓️ 2026-02-18: Issue #75 — remote MCP transport wrapper (5-Round cycle)
 
 ### Summary

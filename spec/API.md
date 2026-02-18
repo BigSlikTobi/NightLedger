@@ -83,6 +83,7 @@ Tool result (`tools/call`):
 
 - `structuredContent` carries the decision object with:
   - `decision_id`
+  - `contract_version`
   - `state`
   - `reason_code`
 - `isError=true` for invalid arguments, with a structured NightLedger error
@@ -95,6 +96,7 @@ Success responses:
 ```json
 {
   "decision_id": "dec_1d51e326dbd1e7f0",
+  "contract_version": "1.0.0",
   "state": "allow",
   "reason_code": "POLICY_ALLOW_WITHIN_THRESHOLD"
 }
@@ -105,6 +107,7 @@ Success responses:
 ```json
 {
   "decision_id": "dec_8b43f6748da8bb2d",
+  "contract_version": "1.0.0",
   "state": "requires_approval",
   "reason_code": "AMOUNT_ABOVE_THRESHOLD"
 }
@@ -246,6 +249,29 @@ OAuth-ready metadata endpoint:
 
 Remote `tools/call` uses the same `authorize_action` logic and schema contract
 as HTTP `POST /v1/mcp/authorize_action` and MCP stdio transport.
+
+## authorize_action contract versioning policy
+
+NightLedger treats `authorize_action` as a versioned product interface.
+
+Version marker:
+
+- Responses and tool metadata include `contract_version`.
+- Current marker: `1.0.0`.
+
+Compatibility rules:
+
+- Additive fields are considered backward-compatible.
+- Existing required fields and enum semantics must remain stable within the
+  same contract version.
+- Breaking changes require a new contract version marker and explicit migration
+  notes in docs.
+
+deprecation policy:
+
+- Deprecated fields remain readable for at least one documented version window
+  before removal.
+- Deprecation notices must be published in `README.md` and `spec/API.md`.
 
 ## POST /v1/events
 
