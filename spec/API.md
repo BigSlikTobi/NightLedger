@@ -41,6 +41,12 @@ Request payload:
 }
 ```
 
+Optional context fields:
+
+- `run_id`: when supplied, runtime decision/token/execution receipts are
+  appended to that run and become available in journal/status projections.
+- `merchant`: optional merchant descriptor used for payload-bound token hash.
+
 ## MCP stdio server: `authorize_action` tool
 
 NightLedger also exposes the same transport contract through a local MCP stdio
@@ -277,6 +283,45 @@ Common risk-governance violation detail codes:
 - `RULE-RISK-005`: `MISSING_RISK_EVIDENCE`
 
 Storage append error response (v0 draft):
+
+## POST /v1/approvals/decisions/{decision_id}/execution-token
+
+Mint an execution token for a previously approved `purchase.create` decision.
+
+Behavior:
+
+- `200 OK` when approval state is `approved` for `decision_id`.
+- `409 Conflict` when approval is `pending` or `rejected`
+  (`EXECUTION_DECISION_NOT_APPROVED`).
+- Response includes:
+  - `decision_id`
+  - `action` (`purchase.create`)
+  - `execution_token`
+  - `expires_at`
+
+## POST /v1/executors/purchase.create
+
+Protected runtime executor for `purchase.create`.
+
+Authorization:
+
+- Requires `Authorization: Bearer <execution_token>`.
+
+Verification rules:
+
+- Token must be cryptographically valid.
+- Token must be unexpired.
+- Token action binding must match `purchase.create`.
+- Token must be single-use; replay attempts fail.
+
+Error detail codes:
+
+- `EXECUTION_TOKEN_MISSING`
+- `EXECUTION_TOKEN_INVALID`
+- `EXECUTION_TOKEN_EXPIRED`
+- `EXECUTION_TOKEN_REPLAYED`
+- `EXECUTION_ACTION_MISMATCH`
+- `EXECUTION_DECISION_NOT_APPROVED`
 
 ```json
 {
@@ -999,3 +1044,75 @@ Behavior:
 - Intended for polling/UI refresh; payload is stable and deterministic.
 - If any run contains an inconsistent approval timeline, endpoint returns `409`
   / `INCONSISTENT_RUN_STATE` (fail-loud semantics).
+
+## POST /v1/approvals/decisions/{decision_id}/execution-token
+
+Mint a short-lived execution token for `purchase.create`.
+
+Request payload:
+
+```json
+{
+  "amount": 500,
+  "currency": "EUR",
+  "merchant": "ACME GmbH"
+}
+```
+
+`execution_token` is payload-bound to these fields and cannot be reused with a
+different request body.
+
+Behavior:
+
+- `200 OK` when approval decision status is `approved`.
+- `404 Not Found` when `decision_id` does not exist.
+- `409 Conflict` with `EXECUTION_DECISION_NOT_APPROVED` when decision is
+  `pending` or `rejected`.
+
+Success response:
+
+```json
+{
+  "decision_id": "dec_...",
+  "action": "purchase.create",
+  "execution_token": "<signed-token>",
+  "expires_at": "2026-02-18T12:05:00Z"
+}
+```
+
+## POST /v1/executors/purchase.create
+
+Protected runtime executor for purchase execution.
+
+Authorization:
+
+- Required header: `Authorization: Bearer <execution_token>`.
+
+Behavior:
+
+- `200 OK` with execution receipt when token is valid and unused.
+- `403 Forbidden` for token auth failures:
+  - `EXECUTION_TOKEN_MISSING`
+  - `EXECUTION_TOKEN_INVALID`
+  - `EXECUTION_TOKEN_EXPIRED`
+  - `EXECUTION_TOKEN_REPLAYED`
+  - `EXECUTION_ACTION_MISMATCH`
+  - `EXECUTION_PAYLOAD_MISMATCH`
+
+Token hardening notes:
+
+- Tokens include `kid` and support key-rotation verification.
+- Runtime validates payload binding hash before execution.
+- Replay protection is durable via SQLite-backed `jti` consumption ledger.
+
+Success response:
+
+```json
+{
+  "status": "executed",
+  "action": "purchase.create",
+  "decision_id": "dec_...",
+  "execution_id": "exec_...",
+  "executed_at": "2026-02-18T12:01:00Z"
+}
+```

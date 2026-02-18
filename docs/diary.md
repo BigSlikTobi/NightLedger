@@ -1910,3 +1910,130 @@ see traceability, approval context, and evidence details directly in the UI.
 - **Validation evidence:**
   - `cd apps/web && node --test model/*.test.js controller/*.test.js view/*.test.js`
   - `./.venv/bin/pytest -q`
+
+---
+
+## 🗓️ 2026-02-18: Issue #47 — Token-Gated Purchase Executor Enforcement
+
+### Goal
+
+Implement runtime enforcement so `purchase.create` cannot execute without a
+valid NightLedger execution token, with fail-closed behavior for missing,
+invalid, expired, tampered, and replayed tokens.
+
+### 5-Round TDD Execution Summary
+
+1. **Round 1 (docs foundation):** Added doc-lock tests and updated
+   `spec/API.md`, `README.md`, and
+   `docs/artifacts/issue-47/sub_issues.md`.
+2. **Round 2 (token service):** Added HMAC token mint/verify service with
+   expiry and action binding checks.
+3. **Round 3 (executor boundary):** Added
+   `POST /v1/executors/purchase.create` with structured enforcement errors.
+4. **Round 4 (integration + replay):** Added token issuance on
+   `allow`, added
+   `POST /v1/approvals/decisions/{decision_id}/execution-token`, and enforced
+   single-use replay rejection.
+5. **Round 5 (final audit):** Added end-to-end acceptance tests and closure
+   artifacts including post-implementation gap assessment.
+
+### Shipped Behavior
+
+- `authorize_action` returns `execution_token` for `allow` decisions.
+- Approved decisions can mint execution token by decision id.
+- Protected executor requires `Authorization: Bearer <execution_token>`.
+- Structured hard-fail codes:
+  - `EXECUTION_TOKEN_MISSING`
+  - `EXECUTION_TOKEN_INVALID`
+  - `EXECUTION_TOKEN_EXPIRED`
+  - `EXECUTION_TOKEN_REPLAYED`
+  - `EXECUTION_ACTION_MISMATCH`
+  - `EXECUTION_DECISION_NOT_APPROVED`
+
+### Validation Evidence
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_issue47_executor_enforcement_docs.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_execution_token_service.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_purchase_executor_api.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_execution_token_integration_api.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_issue47_end_to_end_api.py tests/test_issue47_enforcement_closure_docs.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+
+### Findings
+
+- Issue #47 is closed at runtime enforcement boundary level.
+- Remaining gaps are explicitly documented in
+  `docs/artifacts/issue-47/gap_assessment.md` for #48/#49/#75/#76.
+
+---
+
+## 🗓️ 2026-02-18: Issue #47 Hardening Pass — Key Rotation, Payload Binding, Durable Replay
+
+### Objective
+
+Harden execution token security posture beyond baseline #47 enforcement by
+adding key-rotation support, stronger secret requirements, payload binding, and
+durable replay protection.
+
+### What changed
+
+- Added `kid` support to token claims with key-map verification.
+- Added strict secret-strength validation (minimum 32 chars).
+- Added payload-hash binding and verification for purchase execution requests.
+- Added durable replay protection using SQLite-backed consumed `jti` ledger.
+- Added new error codes:
+  - `EXECUTION_PAYLOAD_MISMATCH`
+  - `EXECUTION_TOKEN_MISCONFIGURED`
+
+### Validation evidence
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_execution_token_service.py tests/test_purchase_executor_api.py tests/test_execution_token_integration_api.py tests/test_issue47_end_to_end_api.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+- `cd apps/web && node --test model/*.test.js controller/*.test.js view/*.test.js`
+
+### Findings
+
+- Token misuse is significantly harder: stolen token cannot execute with altered
+  payload and cannot be replayed after first use.
+- Runtime now supports safe key rotation via `kid` lookup.
+- Remaining future hardening (outside this pass): managed KMS integration and
+  clustered replay-store backend.
+
+---
+
+## 🗓️ 2026-02-18: Issue #47 UI Representation + Persistence Pass (5-Round TDD)
+
+### Objective
+
+Move execution-token flow visibility from mostly hardcoded/demo representation
+into append-only runtime receipts that the live UI can project from real run
+state, and add event-store persistence option.
+
+### Round outcomes
+
+1. **Round 1:** Added failing tests for authorize decision/token mint receipts in
+   run journal; implemented runtime receipt appends for `authorize_action`.
+2. **Round 2:** Added failing test for post-approval token-mint receipt;
+   implemented append on
+   `POST /v1/approvals/decisions/{decision_id}/execution-token`.
+3. **Round 3:** Added failing tests for execution success + blocked-path receipts;
+   implemented append-only `error` and `action` runtime receipts on executor
+   paths.
+4. **Round 4:** Added failing persistence test and implemented
+   `SQLiteAppendOnlyEventStore` with `NIGHTLEDGER_EVENT_STORE_BACKEND=sqlite`.
+5. **Round 5:** Added live-mode UI polling wiring test and implemented periodic
+   refresh for timeline + pending approvals so new receipts appear without manual
+   reload.
+
+### Validation evidence
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_issue47_runtime_receipts_api.py tests/test_execution_token_integration_api.py tests/test_purchase_executor_api.py tests/test_issue47_end_to_end_api.py`
+- `cd apps/web && node --test model/*.test.js controller/*.test.js view/*.test.js`
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+
+### Findings
+
+- Live representation now tracks real authorize/mint/execute receipts for a
+  provided `run_id`.
+- Operators can persist runtime events across restarts using sqlite backend
+  config, reducing demo drift from in-memory resets.

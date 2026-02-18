@@ -14,6 +14,14 @@ from nightledger_api.services.errors import (
     SchemaValidationError,
     StorageReadError,
     StorageWriteError,
+    ExecutionActionMismatchError,
+    ExecutionDecisionNotApprovedError,
+    ExecutionTokenExpiredError,
+    ExecutionTokenInvalidError,
+    ExecutionTokenMisconfiguredError,
+    ExecutionTokenMissingError,
+    ExecutionTokenReplayedError,
+    ExecutionPayloadMismatchError,
 )
 
 
@@ -290,6 +298,146 @@ def present_authorize_action_validation_errors(
             "code": "REQUEST_VALIDATION_ERROR",
             "message": "authorize_action payload failed validation",
             "details": details,
+        }
+    }
+
+
+def present_execution_token_missing_error(exc: ExecutionTokenMissingError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "EXECUTION_TOKEN_MISSING",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "authorization",
+                    "message": str(exc),
+                    "type": "auth_error",
+                    "code": "EXECUTION_TOKEN_MISSING",
+                }
+            ],
+        }
+    }
+
+
+def present_execution_token_invalid_error(exc: ExecutionTokenInvalidError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "EXECUTION_TOKEN_INVALID",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "authorization",
+                    "message": str(exc),
+                    "type": "auth_error",
+                    "code": "EXECUTION_TOKEN_INVALID",
+                }
+            ],
+        }
+    }
+
+
+def present_execution_token_expired_error(exc: ExecutionTokenExpiredError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "EXECUTION_TOKEN_EXPIRED",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "authorization",
+                    "message": str(exc),
+                    "type": "auth_error",
+                    "code": "EXECUTION_TOKEN_EXPIRED",
+                }
+            ],
+        }
+    }
+
+
+def present_execution_token_replayed_error(exc: ExecutionTokenReplayedError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "EXECUTION_TOKEN_REPLAYED",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "authorization",
+                    "message": str(exc),
+                    "type": "auth_error",
+                    "code": "EXECUTION_TOKEN_REPLAYED",
+                }
+            ],
+        }
+    }
+
+
+def present_execution_action_mismatch_error(exc: ExecutionActionMismatchError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "EXECUTION_ACTION_MISMATCH",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "authorization",
+                    "message": str(exc),
+                    "type": "auth_error",
+                    "code": "EXECUTION_ACTION_MISMATCH",
+                }
+            ],
+        }
+    }
+
+
+def present_execution_decision_not_approved_error(
+    exc: ExecutionDecisionNotApprovedError,
+) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "EXECUTION_DECISION_NOT_APPROVED",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "decision_id",
+                    "message": str(exc),
+                    "type": "state_conflict",
+                    "code": "EXECUTION_DECISION_NOT_APPROVED",
+                }
+            ],
+        }
+    }
+
+
+def present_execution_payload_mismatch_error(exc: ExecutionPayloadMismatchError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "EXECUTION_PAYLOAD_MISMATCH",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "payload",
+                    "message": str(exc),
+                    "type": "auth_error",
+                    "code": "EXECUTION_PAYLOAD_MISMATCH",
+                }
+            ],
+        }
+    }
+
+
+def present_execution_token_misconfigured_error(
+    exc: ExecutionTokenMisconfiguredError,
+) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "EXECUTION_TOKEN_MISCONFIGURED",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "configuration",
+                    "message": str(exc),
+                    "type": "configuration_error",
+                    "code": "EXECUTION_TOKEN_MISCONFIGURED",
+                }
+            ],
         }
     }
 

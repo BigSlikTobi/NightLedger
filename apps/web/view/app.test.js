@@ -14,3 +14,10 @@ test("round5 template renders canonical journal metadata fields", () => {
   assert.match(appSource, /card\.payloadPath/);
   assert.match(appSource, /card\.evidenceItems/);
 });
+
+test("round5 live mode polling refresh is wired", () => {
+  assert.match(appSource, /setInterval\(\(\) => \{/);
+  assert.match(appSource, /controller\.load\(\)/);
+  assert.match(appSource, /controller\.loadPendingApprovals\(\)/);
+  assert.match(appSource, /clearInterval/);
+});

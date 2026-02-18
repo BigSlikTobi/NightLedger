@@ -1,8 +1,11 @@
 import json
 import logging
+import os
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Header, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from nightledger_api.services.approval_service import (
@@ -13,12 +16,17 @@ from nightledger_api.services.approval_service import (
     resolve_pending_approval,
 )
 from nightledger_api.services.authorize_action_service import (
+    AuthorizeActionContext,
     AuthorizeActionRequest,
     evaluate_authorize_action,
 )
 from nightledger_api.services.business_rules_service import validate_event_business_rules
 from nightledger_api.services.event_ingest_service import validate_event_payload
-from nightledger_api.services.event_store import EventStore, InMemoryAppendOnlyEventStore
+from nightledger_api.services.event_store import (
+    EventStore,
+    InMemoryAppendOnlyEventStore,
+    SQLiteAppendOnlyEventStore,
+)
 from nightledger_api.services.errors import (
     AmbiguousEventIdError,
     ApprovalNotFoundError,
@@ -31,17 +39,35 @@ from nightledger_api.services.errors import (
     SchemaValidationError,
     StorageReadError,
     StorageWriteError,
+    ExecutionActionMismatchError,
+    ExecutionDecisionNotApprovedError,
+    ExecutionPayloadMismatchError,
+    ExecutionTokenExpiredError,
+    ExecutionTokenInvalidError,
+    ExecutionTokenMissingError,
+    ExecutionTokenReplayedError,
 )
+from nightledger_api.services.execution_token_service import (
+    build_purchase_payload_hash,
+    mint_execution_token,
+    verify_execution_token,
+)
+from nightledger_api.services.execution_replay_store import SQLiteExecutionReplayStore
 from nightledger_api.services.journal_projection_service import project_run_journal
 from nightledger_api.services.run_status_service import project_run_status
 
 
 router = APIRouter()
-_event_store = InMemoryAppendOnlyEventStore()
+_EVENT_STORE_BACKEND_ENV = "NIGHTLEDGER_EVENT_STORE_BACKEND"
+_EVENT_STORE_DB_PATH_ENV = "NIGHTLEDGER_EVENT_STORE_DB_PATH"
+_DEFAULT_EVENT_STORE_BACKEND = "memory"
+_DEFAULT_EVENT_STORE_DB_PATH = "/tmp/nightledger_events.db"
+_event_store: EventStore | None = None
 logger = logging.getLogger(__name__)
 uvicorn_logger = logging.getLogger("uvicorn.error")
 logger.setLevel(logging.INFO)
 uvicorn_logger.setLevel(logging.INFO)
+_execution_replay_store = SQLiteExecutionReplayStore()
 
 
 class ApprovalDecisionRequest(BaseModel):
@@ -64,14 +90,42 @@ class ApprovalRequestRegistrationPayload(BaseModel):
     reason: str | None = None
 
 
+class PurchaseCreateExecutionRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    run_id: str | None = None
+    amount: float = Field(gt=0)
+    currency: Literal["EUR"]
+    merchant: str = Field(min_length=1)
+
+
+class ExecutionTokenMintRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    amount: float = Field(gt=0)
+    currency: Literal["EUR"]
+    merchant: str = Field(min_length=1)
+
+
 def get_event_store() -> EventStore:
+    global _event_store
+    if _event_store is None:
+        _event_store = _build_event_store()
     return _event_store
 
 
 def _reset_event_store() -> EventStore:
     global _event_store
-    _event_store = InMemoryAppendOnlyEventStore()
+    _event_store = _build_event_store()
     return _event_store
+
+
+def _build_event_store() -> EventStore:
+    backend = os.getenv(_EVENT_STORE_BACKEND_ENV, _DEFAULT_EVENT_STORE_BACKEND).strip().lower()
+    if backend == "sqlite":
+        path = os.getenv(_EVENT_STORE_DB_PATH_ENV, _DEFAULT_EVENT_STORE_DB_PATH).strip()
+        return SQLiteAppendOnlyEventStore(path=path or _DEFAULT_EVENT_STORE_DB_PATH)
+    return InMemoryAppendOnlyEventStore()
 
 
 def _triage_inbox_seed_payloads() -> list[dict[str, Any]]:
@@ -256,8 +310,52 @@ def _log_structured(level: int, payload: dict[str, Any], *, exc_info: bool = Fal
 
 
 @router.post("/v1/mcp/authorize_action", status_code=status.HTTP_200_OK)
-def authorize_action(payload: AuthorizeActionRequest) -> dict[str, str]:
-    return evaluate_authorize_action(payload=payload)
+def authorize_action(
+    payload: AuthorizeActionRequest,
+    store: EventStore = Depends(get_event_store),
+) -> dict[str, Any]:
+    decision = evaluate_authorize_action(payload=payload)
+    run_id = _context_run_id(context=payload.context, decision_id=decision["decision_id"])
+
+    _append_runtime_receipt(
+        store=store,
+        run_id=run_id,
+        event_type="decision",
+        title="authorize_action decision recorded",
+        details=(
+            f"decision_id={decision['decision_id']} "
+            f"state={decision['state']} reason_code={decision['reason_code']}"
+        ),
+        decision_id=decision["decision_id"],
+        step="authorize_action_decision",
+    )
+    if decision["state"] != "allow":
+        return decision
+
+    token, expires_at = mint_execution_token(
+        decision_id=decision["decision_id"],
+        action=payload.intent.action,
+        run_id=run_id,
+        payload_hash=build_purchase_payload_hash(
+            amount=payload.context.amount,
+            currency=payload.context.currency,
+            merchant=_context_merchant(payload.context),
+        ),
+    )
+    _append_runtime_receipt(
+        store=store,
+        run_id=run_id,
+        event_type="decision",
+        title="execution token minted",
+        details=f"decision_id={decision['decision_id']} expires_at={expires_at}",
+        decision_id=decision["decision_id"],
+        step="execution_token_minted",
+    )
+    return {
+        **decision,
+        "execution_token": token,
+        "execution_token_expires_at": expires_at,
+    }
 
 
 @router.post("/v1/events", status_code=status.HTTP_201_CREATED)
@@ -490,3 +588,222 @@ def get_approval_by_decision_id(
         raise
     except Exception as exc:  # pragma: no cover - defensive wrapper
         raise StorageReadError("storage backend read failed") from exc
+
+
+@router.post("/v1/executors/purchase.create", status_code=status.HTTP_200_OK)
+def execute_purchase_create(
+    payload: PurchaseCreateExecutionRequest,
+    store: EventStore = Depends(get_event_store),
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    token = _extract_bearer_token(authorization)
+    try:
+        claims = verify_execution_token(
+            token=token,
+            expected_action="purchase.create",
+            expected_payload_hash=build_purchase_payload_hash(
+                amount=payload.amount,
+                currency=payload.currency,
+                merchant=payload.merchant,
+            ),
+        )
+    except (
+        ExecutionTokenInvalidError,
+        ExecutionTokenExpiredError,
+        ExecutionActionMismatchError,
+        ExecutionPayloadMismatchError,
+    ) as exc:
+        run_id = payload.run_id or "run_execution_gate_unscoped"
+        _append_runtime_receipt(
+            store=store,
+            run_id=run_id,
+            event_type="error",
+            title="purchase.create blocked",
+            details=f"code={_error_code_for_exception(exc)}",
+            decision_id=None,
+            step="execution_blocked",
+        )
+        raise
+    run_id = _claim_run_id(claims=claims, fallback_run_id=payload.run_id)
+    jti = str(claims["jti"])
+    consumed = _execution_replay_store.consume_once(
+        jti=jti,
+        exp_unix=int(claims["exp"]),
+    )
+    if not consumed:
+        _append_runtime_receipt(
+            store=store,
+            run_id=run_id,
+            event_type="error",
+            title="purchase.create blocked",
+            details="code=EXECUTION_TOKEN_REPLAYED",
+            decision_id=str(claims["decision_id"]),
+            step="execution_blocked",
+        )
+        raise ExecutionTokenReplayedError()
+
+    execution_id = f"exec_{uuid4().hex[:16]}"
+    executed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    _append_runtime_receipt(
+        store=store,
+        run_id=run_id,
+        event_type="action",
+        title="purchase.create executed",
+        details=(
+            f"decision_id={claims['decision_id']} execution_id={execution_id} "
+            f"amount={payload.amount} currency={payload.currency} merchant={payload.merchant}"
+        ),
+        decision_id=str(claims["decision_id"]),
+        step="purchase_executed",
+    )
+    return {
+        "status": "executed",
+        "action": "purchase.create",
+        "decision_id": claims["decision_id"],
+        "execution_id": execution_id,
+        "executed_at": executed_at,
+    }
+
+
+@router.post("/v1/approvals/decisions/{decision_id}/execution-token", status_code=status.HTTP_200_OK)
+def mint_execution_token_for_decision(
+    decision_id: str,
+    payload: ExecutionTokenMintRequest,
+    store: EventStore = Depends(get_event_store),
+) -> dict[str, Any]:
+    state = get_approval_decision_state(store=store, decision_id=decision_id)
+    if state["status"] != "approved":
+        raise ExecutionDecisionNotApprovedError(decision_id=decision_id)
+
+    token, expires_at = mint_execution_token(
+        decision_id=decision_id,
+        action="purchase.create",
+        run_id=state["run_id"],
+        payload_hash=build_purchase_payload_hash(
+            amount=payload.amount,
+            currency=payload.currency,
+            merchant=payload.merchant,
+        ),
+    )
+    _append_runtime_receipt(
+        store=store,
+        run_id=str(state["run_id"]),
+        event_type="decision",
+        title="execution token minted",
+        details=f"decision_id={decision_id} expires_at={expires_at}",
+        decision_id=decision_id,
+        step="execution_token_minted",
+    )
+    return {
+        "decision_id": decision_id,
+        "action": "purchase.create",
+        "execution_token": token,
+        "expires_at": expires_at,
+    }
+
+
+def _extract_bearer_token(authorization: str | None) -> str:
+    if authorization is None:
+        raise ExecutionTokenMissingError()
+    value = authorization.strip()
+    if not value:
+        raise ExecutionTokenMissingError()
+    prefix = "bearer "
+    if not value.lower().startswith(prefix):
+        raise ExecutionTokenMissingError()
+    token = value[len(prefix) :].strip()
+    if not token:
+        raise ExecutionTokenMissingError()
+    return token
+
+
+def _context_merchant(context: AuthorizeActionContext) -> str | None:
+    merchant = _context_extra_value(context=context, key="merchant")
+    if merchant is None:
+        return None
+    if isinstance(merchant, str):
+        value = merchant.strip()
+        return value if value else None
+    return str(merchant)
+
+
+def _context_run_id(*, context: AuthorizeActionContext, decision_id: str) -> str:
+    run_id = _context_extra_value(context=context, key="run_id")
+    if isinstance(run_id, str) and run_id.strip():
+        return run_id.strip()
+    request_id = _context_extra_value(context=context, key="request_id")
+    if isinstance(request_id, str) and request_id.strip():
+        return f"run_{request_id.strip()}"
+    return f"run_{decision_id}"
+
+
+def _context_extra_value(*, context: AuthorizeActionContext, key: str) -> Any:
+    extras = getattr(context, "model_extra", None)
+    if isinstance(extras, dict):
+        return extras.get(key)
+    return None
+
+
+def _claim_run_id(*, claims: dict[str, Any], fallback_run_id: str | None) -> str:
+    claimed = claims.get("run_id")
+    if isinstance(claimed, str) and claimed.strip():
+        return claimed
+    if fallback_run_id is not None and fallback_run_id.strip():
+        return fallback_run_id.strip()
+    return f"run_{claims.get('decision_id', 'execution_gate')}"
+
+
+def _append_runtime_receipt(
+    *,
+    store: EventStore,
+    run_id: str,
+    event_type: Literal["decision", "action", "error"],
+    title: str,
+    details: str,
+    decision_id: str | None,
+    step: str,
+) -> None:
+    now = datetime.now(timezone.utc)
+    existing = store.list_by_run_id(run_id)
+    if existing and now <= existing[-1].timestamp:
+        now = existing[-1].timestamp + timedelta(milliseconds=1)
+
+    event_payload = {
+        "id": f"evt_runtime_{uuid4().hex[:16]}",
+        "run_id": run_id,
+        "timestamp": now.isoformat().replace("+00:00", "Z"),
+        "type": event_type,
+        "actor": "system",
+        "title": title,
+        "details": details,
+        "confidence": 1.0,
+        "risk_level": "low",
+        "requires_approval": False,
+        "approval": {
+            "status": "not_required",
+            "decision_id": None,
+            "requested_by": None,
+            "resolved_by": None,
+            "resolved_at": None,
+            "reason": None,
+        },
+        "evidence": [],
+        "meta": {
+            "workflow": "execution_gate",
+            "step": step,
+        },
+    }
+    event = validate_event_payload(event_payload)
+    store.append(event)
+
+
+def _error_code_for_exception(exc: Exception) -> str:
+    if isinstance(exc, ExecutionTokenInvalidError):
+        return "EXECUTION_TOKEN_INVALID"
+    if isinstance(exc, ExecutionTokenExpiredError):
+        return "EXECUTION_TOKEN_EXPIRED"
+    if isinstance(exc, ExecutionActionMismatchError):
+        return "EXECUTION_ACTION_MISMATCH"
+    if isinstance(exc, ExecutionPayloadMismatchError):
+        return "EXECUTION_PAYLOAD_MISMATCH"
+    return "EXECUTION_BLOCKED"

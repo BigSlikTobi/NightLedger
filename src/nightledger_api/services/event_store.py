@@ -2,6 +2,9 @@ from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
+import json
+import os
+import sqlite3
 from typing import Any, Protocol
 
 from nightledger_api.models.event_schema import EventPayload
@@ -110,4 +113,117 @@ class InMemoryAppendOnlyEventStore:
             integrity_warning=record.integrity_warning,
         )
 
+
+class SQLiteAppendOnlyEventStore:
+    def __init__(self, *, path: str) -> None:
+        self._path = path
+        self._ensure_schema()
+
+    def append(self, event: EventPayload) -> StoredEvent:
+        integrity_warning = False
+        with sqlite3.connect(self._path) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            last_row = conn.execute(
+                """
+                SELECT timestamp
+                FROM events
+                WHERE run_id = ?
+                ORDER BY sequence DESC
+                LIMIT 1
+                """,
+                (event.run_id,),
+            ).fetchone()
+            if last_row is not None:
+                last_timestamp = datetime.fromisoformat(str(last_row[0]))
+                if event.timestamp < last_timestamp:
+                    integrity_warning = True
+
+            try:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO events (run_id, event_id, timestamp, payload_json, integrity_warning)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        event.run_id,
+                        event.id,
+                        event.timestamp.isoformat(),
+                        json.dumps(event.model_dump(mode="json"), separators=(",", ":")),
+                        1 if integrity_warning else 0,
+                    ),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise DuplicateEventError(event_id=event.id, run_id=event.run_id) from exc
+
+            row = conn.execute(
+                """
+                SELECT sequence, run_id, event_id, timestamp, payload_json, integrity_warning
+                FROM events
+                WHERE sequence = ?
+                """,
+                (cursor.lastrowid,),
+            ).fetchone()
+            assert row is not None  # pragma: no cover - sqlite insert/read contract
+            return self._to_stored_event(row)
+
+    def list_by_run_id(self, run_id: str) -> list[StoredEvent]:
+        with sqlite3.connect(self._path) as conn:
+            rows = conn.execute(
+                """
+                SELECT sequence, run_id, event_id, timestamp, payload_json, integrity_warning
+                FROM events
+                WHERE run_id = ?
+                ORDER BY timestamp ASC, sequence ASC
+                """,
+                (run_id,),
+            ).fetchall()
+        return [self._to_stored_event(row) for row in rows]
+
+    def list_all(self) -> list[StoredEvent]:
+        with sqlite3.connect(self._path) as conn:
+            rows = conn.execute(
+                """
+                SELECT sequence, run_id, event_id, timestamp, payload_json, integrity_warning
+                FROM events
+                ORDER BY timestamp ASC, sequence ASC
+                """
+            ).fetchall()
+        return [self._to_stored_event(row) for row in rows]
+
+    def _ensure_schema(self) -> None:
+        directory = os.path.dirname(self._path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with sqlite3.connect(self._path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS events (
+                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    event_id TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    integrity_warning INTEGER NOT NULL DEFAULT 0,
+                    UNIQUE(run_id, event_id)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_events_run_time
+                ON events(run_id, timestamp, sequence)
+                """
+            )
+            conn.commit()
+
+    def _to_stored_event(self, row: tuple[Any, ...]) -> StoredEvent:
+        _sequence, run_id, event_id, timestamp, payload_json, integrity_warning = row
+        return StoredEvent(
+            id=str(event_id),
+            timestamp=datetime.fromisoformat(str(timestamp)),
+            run_id=str(run_id),
+            payload=deepcopy(json.loads(str(payload_json))),
+            integrity_warning=bool(integrity_warning),
+        )
 

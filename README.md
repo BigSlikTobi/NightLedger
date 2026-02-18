@@ -100,7 +100,7 @@ curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
 ```
 
 ```json
-{"decision_id":"dec_...","state":"allow","reason_code":"POLICY_ALLOW_WITHIN_THRESHOLD"}
+{"decision_id":"dec_...","state":"allow","reason_code":"POLICY_ALLOW_WITHIN_THRESHOLD","execution_token":"<signed-token>","execution_token_expires_at":"2026-02-18T12:05:00Z"}
 ```
 
 Requires approval response (`amount` above threshold):
@@ -187,3 +187,59 @@ New approval lifecycle endpoints:
 Legacy compatibility:
 
 - `POST /v1/approvals/{event_id}` remains available during migration.
+
+## Token-Gated Executor Flow (Issue #47)
+
+NightLedger enforces a hard runtime trust boundary for `purchase.create`.
+
+1. Policy decision:
+   `POST /v1/mcp/authorize_action` returns `allow` or `requires_approval`.
+   Include `context.run_id` to bind generated runtime receipts to a specific
+   live timeline run.
+2. Approval token minting:
+   `POST /v1/approvals/decisions/{decision_id}/execution-token` returns a short-lived
+   `execution_token` only when the decision is approved and binds token to the
+   requested purchase payload (`amount`, `currency`, `merchant`).
+3. Protected execution:
+   `POST /v1/executors/purchase.create` requires
+   `Authorization: Bearer <execution_token>`.
+
+Fail-closed behavior:
+
+- Missing token -> blocked.
+- Invalid/tampered token -> blocked.
+- Expired token -> blocked.
+- Replayed token -> blocked.
+
+Token mint and execution examples:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/approvals/decisions/dec_123/execution-token \
+  -H "Content-Type: application/json" \
+  -d '{"amount":500,"currency":"EUR","merchant":"ACME GmbH"}'
+```
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/executors/purchase.create \
+  -H "Authorization: Bearer <signed-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"amount":500,"currency":"EUR","merchant":"ACME GmbH"}'
+```
+
+Security runtime config:
+
+- `NIGHTLEDGER_EXECUTION_TOKEN_SECRET`: signing secret (legacy single-key mode)
+- `NIGHTLEDGER_EXECUTION_TOKEN_KEYS`: comma-separated `kid:secret` keyring
+- `NIGHTLEDGER_EXECUTION_TOKEN_ACTIVE_KID`: active key identifier for minting
+- `NIGHTLEDGER_EXECUTION_TOKEN_REPLAY_DB_PATH`: durable replay store path
+
+Runtime receipt persistence config:
+
+- `NIGHTLEDGER_EVENT_STORE_BACKEND`: `memory` (default) or `sqlite`
+- `NIGHTLEDGER_EVENT_STORE_DB_PATH`: sqlite file path when backend is `sqlite`
+
+When `context.run_id` is set, authorize/mint/execute flows append runtime
+receipt events that are visible in:
+
+- `GET /v1/runs/{run_id}/events`
+- `GET /v1/runs/{run_id}/journal`
