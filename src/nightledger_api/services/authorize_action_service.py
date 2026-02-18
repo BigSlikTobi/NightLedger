@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 AuthorizeActionState = Literal["allow", "requires_approval", "deny"]
 _DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR = 100.0
 _PURCHASE_APPROVAL_THRESHOLD_ENV = "NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR"
+AUTHORIZE_ACTION_CONTRACT_VERSION = "1.0.0"
 
 
 class AuthorizeActionIntent(BaseModel):
@@ -41,6 +42,7 @@ def evaluate_authorize_action(payload: AuthorizeActionRequest) -> dict[str, str]
     )
     return {
         "decision_id": _build_deterministic_decision_id(payload=payload),
+        "contract_version": AUTHORIZE_ACTION_CONTRACT_VERSION,
         "state": state,
         "reason_code": _reason_code_for_state(state=state),
     }

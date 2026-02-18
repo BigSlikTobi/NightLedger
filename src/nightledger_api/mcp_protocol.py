@@ -7,6 +7,7 @@ from nightledger_api.presenters.error_presenter import (
     present_authorize_action_validation_errors,
 )
 from nightledger_api.services.authorize_action_service import (
+    AUTHORIZE_ACTION_CONTRACT_VERSION,
     AuthorizeActionRequest,
     evaluate_authorize_action,
 )
@@ -107,6 +108,11 @@ def authorize_action_tool_definition() -> dict[str, Any]:
             "Authorize an action intent before execution. "
             "Supports purchase.create in v1."
         ),
+        "x-nightledger-contract": {
+            "name": "authorize_action",
+            "version": AUTHORIZE_ACTION_CONTRACT_VERSION,
+            "compatibility": "backward-compatible",
+        },
         "inputSchema": {
             "type": "object",
             "additionalProperties": False,
