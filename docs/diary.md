@@ -8,6 +8,69 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #44 — sub-issue 4 MCP stdio server wrapper
+
+### Summary
+
+Implemented a shippable MCP stdio server wrapper at
+`src/nightledger_api/mcp_server.py` so agent clients can call NightLedger via
+MCP instead of HTTP-only transport. The server now supports `initialize`,
+`notifications/initialized`, `tools/list`, and `tools/call`, and exposes one
+tool: `authorize_action`. Tool calls reuse the same deterministic
+authorize-action service used by the HTTP endpoint, including decision states
+(`allow`, `requires_approval`, `deny`), deterministic `decision_id`, and
+structured validation envelopes for invalid arguments. The authorize-action
+contract logic was moved to a shared service to keep HTTP and MCP behavior in
+lockstep.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_mcp_stdio_server.py`
+- `./.venv/bin/pytest -q tests/test_mcp_authorize_action_api.py`
+- `./.venv/bin/pytest -q tests/test_issue44_mcp_authorize_action_docs.py`
+- `./.venv/bin/pytest -q`
+- `node --test model/*.test.js controller/*.test.js view/*.test.js`
+
+## 🗓️ 2026-02-18: Issue #44 — sub-issues 2 and 3 decision states + operator docs
+
+### Summary
+
+Completed the remaining scope for issue `#44` while keeping policy logic out of
+this transport issue boundary. The `POST /v1/mcp/authorize_action` contract now
+supports deterministic decision states through
+`context.transport_decision_hint` (`allow|requires_approval|deny`) with a
+state-specific `reason_code` mapping and deterministic `decision_id` behavior.
+Added validation support for invalid hints via
+`INVALID_TRANSPORT_DECISION_HINT`. Updated operator-facing docs with copy-paste
+`curl` request/response examples for all three states and added doc-lock tests
+to keep the README/API contract in sync.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_mcp_authorize_action_api.py`
+- `./.venv/bin/pytest -q tests/test_issue44_mcp_authorize_action_docs.py`
+- `./.venv/bin/pytest -q`
+- `node --test model/*.test.js controller/*.test.js view/*.test.js`
+
+## 🗓️ 2026-02-18: Issue #44 — sub-issue 1 transport contract baseline
+
+### Summary
+
+Documented issue `#44` into atomic sub-issues in
+`docs/artifacts/issue-44/sub_issues.md` and completed only sub-issue 1 in this
+branch. Added the initial MCP transport contract endpoint
+`POST /v1/mcp/authorize_action` for `purchase.create`, with deterministic
+`decision_id` generation and structured request-validation errors in the
+standard NightLedger error envelope. This sub-issue intentionally limits
+decision behavior to the transport baseline (`state=allow`) and defers decision
+state expansion/policy logic to later sub-issues.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_mcp_authorize_action_api.py`
+- `./.venv/bin/pytest -q`
+- `node --test model/*.test.js controller/*.test.js view/*.test.js`
+
 ## 🗓️ 2026-02-17: Issue #67 — MCP + policy execution track consolidation
 
 ### Summary

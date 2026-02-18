@@ -3,6 +3,143 @@
 This is the canonical HTTP contract source for NightLedger runtime endpoints,
 response envelopes, and endpoint-level behavior.
 
+## POST /v1/mcp/authorize_action
+
+Authorize an agent intent before an external side effect is executed.
+
+Behavior (issue #44):
+
+- Valid payload: `200 OK`
+- Invalid payload: `422 Unprocessable Entity`
+- Supported action in v1 transport contract: `purchase.create`
+- `context.transport_decision_hint` is optional and supports:
+  `allow|requires_approval|deny`
+- Decision state defaults to `allow` when hint is omitted
+- Every successful decision includes deterministic `decision_id`.
+
+Request payload:
+
+```json
+{
+  "intent": {
+    "action": "purchase.create"
+  },
+  "context": {
+    "request_id": "req_123",
+    "transport_decision_hint": "requires_approval"
+  }
+}
+```
+
+## MCP stdio server: `authorize_action` tool
+
+NightLedger also exposes the same transport contract through a local MCP stdio
+server wrapper.
+
+Supported MCP methods:
+
+- `initialize`
+- `notifications/initialized`
+- `tools/list`
+- `tools/call`
+
+Tool name:
+
+- `authorize_action`
+
+Tool arguments:
+
+```json
+{
+  "intent": {
+    "action": "purchase.create"
+  },
+  "context": {
+    "request_id": "req_123",
+    "transport_decision_hint": "allow"
+  }
+}
+```
+
+Tool result (`tools/call`):
+
+- `structuredContent` carries the decision object with:
+  - `decision_id`
+  - `state`
+  - `reason_code`
+- `isError=true` for invalid arguments, with a structured NightLedger error
+  envelope in the response content and `structuredContent`.
+
+Success responses:
+
+`allow` (default when hint is omitted):
+
+```json
+{
+  "decision_id": "dec_1d51e326dbd1e7f0",
+  "state": "allow",
+  "reason_code": "TRANSPORT_CONTRACT_ACCEPTED"
+}
+```
+
+`requires_approval`:
+
+```json
+{
+  "decision_id": "dec_8b43f6748da8bb2d",
+  "state": "requires_approval",
+  "reason_code": "TRANSPORT_REQUIRES_APPROVAL"
+}
+```
+
+`deny`:
+
+```json
+{
+  "decision_id": "dec_2b57476a7dbf302d",
+  "state": "deny",
+  "reason_code": "TRANSPORT_DENIED"
+}
+```
+
+Request validation error response:
+
+```json
+{
+  "error": {
+    "code": "REQUEST_VALIDATION_ERROR",
+    "message": "authorize_action payload failed validation",
+    "details": [
+      {
+        "path": "intent.action",
+        "message": "Input should be 'purchase.create'",
+        "type": "literal_error",
+        "code": "UNSUPPORTED_ACTION"
+      }
+    ]
+  }
+}
+```
+
+Invalid decision hint example:
+
+```json
+{
+  "error": {
+    "code": "REQUEST_VALIDATION_ERROR",
+    "message": "authorize_action payload failed validation",
+    "details": [
+      {
+        "path": "context.transport_decision_hint",
+        "message": "Input should be 'allow', 'requires_approval' or 'deny'",
+        "type": "literal_error",
+        "code": "INVALID_TRANSPORT_DECISION_HINT"
+      }
+    ]
+  }
+}
+```
+
 ## POST /v1/events
 
 Ingest one event.

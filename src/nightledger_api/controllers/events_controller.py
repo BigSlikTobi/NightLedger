@@ -6,6 +6,10 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from nightledger_api.services.approval_service import list_pending_approvals, resolve_pending_approval
+from nightledger_api.services.authorize_action_service import (
+    AuthorizeActionRequest,
+    evaluate_authorize_action,
+)
 from nightledger_api.services.business_rules_service import validate_event_business_rules
 from nightledger_api.services.event_ingest_service import validate_event_payload
 from nightledger_api.services.event_store import EventStore, InMemoryAppendOnlyEventStore
@@ -231,6 +235,11 @@ def _log_structured(level: int, payload: dict[str, Any], *, exc_info: bool = Fal
     message = json.dumps(payload)
     logger.log(level, message, exc_info=exc_info)
     uvicorn_logger.log(level, message, exc_info=exc_info)
+
+
+@router.post("/v1/mcp/authorize_action", status_code=status.HTTP_200_OK)
+def authorize_action(payload: AuthorizeActionRequest) -> dict[str, str]:
+    return evaluate_authorize_action(payload=payload)
 
 
 @router.post("/v1/events", status_code=status.HTTP_201_CREATED)
