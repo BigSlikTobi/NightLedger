@@ -9,8 +9,8 @@ test("passes approver context to approval resolver", async () => {
     getDemoEvents: async () => [],
     getJournalEvents: async () => [],
     listPendingApprovals: async () => [{ event_id: "evt-ctx", title: "Approval" }],
-    resolveApproval: async (eventId, decision, context) => {
-      captured = { eventId, decision, context };
+    resolveApproval: async (targetId, decision, context) => {
+      captured = { targetId, decision, context };
       return { ok: true };
     },
     onState: () => {},
@@ -20,9 +20,42 @@ test("passes approver context to approval resolver", async () => {
   await controller.submitApprovalDecision("evt-ctx", "approved", { approverId: "human_approver", reason: "validated" });
 
   assert.deepEqual(captured, {
-    eventId: "evt-ctx",
+    targetId: "evt-ctx",
     decision: "approved",
-    context: { approverId: "human_approver", reason: "validated" },
+    context: {
+      approverId: "human_approver",
+      reason: "validated",
+      decisionId: undefined,
+      eventId: "evt-ctx",
+    },
+  });
+});
+
+test("prefers decision_id when resolving pending approvals", async () => {
+  let captured = null;
+  const controller = createTimelineController({
+    runId: "run-decision",
+    getDemoEvents: async () => [],
+    getJournalEvents: async () => [],
+    listPendingApprovals: async () => [{ event_id: "evt-ctx", decision_id: "dec-ctx", title: "Approval" }],
+    resolveApproval: async (targetId, decision, context) => {
+      captured = { targetId, decision, context };
+      return { ok: true };
+    },
+    onState: () => {},
+  });
+
+  await controller.loadPendingApprovals();
+  await controller.submitApprovalDecision("dec-ctx", "approved", { approverId: "human_approver" });
+
+  assert.deepEqual(captured, {
+    targetId: "dec-ctx",
+    decision: "approved",
+    context: {
+      approverId: "human_approver",
+      decisionId: "dec-ctx",
+      eventId: "evt-ctx",
+    },
   });
 });
 

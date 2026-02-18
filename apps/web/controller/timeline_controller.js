@@ -58,38 +58,51 @@ export function createTimelineController({
   }
 
   async function submitApprovalDecision(eventId, decision, context = {}) {
-    const isKnownPending = state.pendingApprovals.some((item) => item.event_id === eventId);
-    if (!isKnownPending) {
+    const pendingItem = state.pendingApprovals.find((item) => {
+      const itemRef = item.decision_id || item.event_id;
+      return itemRef === eventId || item.event_id === eventId;
+    });
+    if (!pendingItem) {
       state.pendingError = "Approval is no longer pending.";
       emit();
       return;
     }
+    const submissionId = pendingItem.decision_id || pendingItem.event_id;
 
-    if (state.pendingSubmissionByEventId[eventId]) return;
+    if (state.pendingSubmissionByEventId[submissionId]) return;
 
-    state.pendingSubmissionByEventId[eventId] = true;
+    state.pendingSubmissionByEventId[submissionId] = true;
     state.pendingError = "";
     emit();
     const approverId = context?.approverId;
+    const decisionId = pendingItem.decision_id;
+    const logIdentity = decisionId ? { eventId: pendingItem.event_id, decisionId } : { eventId: pendingItem.event_id };
     logDecision({
       event: "approval_decision_requested",
       runId,
-      eventId,
+      ...logIdentity,
       decision,
       approverId,
     });
 
     try {
-      await resolveApproval(eventId, decision, context);
+      await resolveApproval(submissionId, decision, {
+        ...context,
+        decisionId,
+        eventId: pendingItem.event_id,
+      });
       logDecision({
         event: "approval_decision_completed",
         runId,
-        eventId,
+        ...logIdentity,
         decision,
         approverId,
       });
       if (runId === "demo") {
-        state.pendingApprovals = state.pendingApprovals.filter((item) => item.event_id !== eventId);
+        state.pendingApprovals = state.pendingApprovals.filter((item) => {
+          const itemRef = item.decision_id || item.event_id;
+          return itemRef !== submissionId;
+        });
         emit();
       } else {
         await load();
@@ -99,7 +112,7 @@ export function createTimelineController({
       logDecision({
         event: "approval_decision_failed",
         runId,
-        eventId,
+        ...logIdentity,
         decision,
         approverId,
         error: err?.message ?? "Unknown error",
@@ -107,7 +120,7 @@ export function createTimelineController({
       state.pendingError = err?.message ?? "Could not resolve approval.";
       emit();
     } finally {
-      state.pendingSubmissionByEventId[eventId] = false;
+      state.pendingSubmissionByEventId[submissionId] = false;
       emit();
     }
   }

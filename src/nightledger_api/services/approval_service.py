@@ -48,6 +48,7 @@ def list_pending_approvals(store: EventStore) -> dict[str, Any]:
         approvals.append(
             {
                 "event_id": pending_event.id,
+                "decision_id": payload.get("approval", {}).get("decision_id"),
                 "run_id": pending_event.run_id,
                 "requested_at": pending_context["requested_at"],
                 "requested_by": pending_context["requested_by"],

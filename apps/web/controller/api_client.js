@@ -29,11 +29,16 @@ export function createApiClient({ apiBase = "", fetcher = fetch } = {}) {
       return body.items ?? body.approvals ?? body.pending ?? [];
     },
 
-    async resolveApproval(eventId, decision, context = {}) {
+    async resolveApproval(targetId, decision, context = {}) {
       const approverId = context.approverId || "human_approver";
       const reason = context.reason;
+      const decisionId = context.decisionId;
+      const eventId = context.eventId || targetId;
+      const path = decisionId
+        ? `/v1/approvals/decisions/${encodeURIComponent(decisionId)}`
+        : `/v1/approvals/${encodeURIComponent(eventId)}`;
 
-      return _request(`/v1/approvals/${encodeURIComponent(eventId)}`, {
+      return _request(path, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ decision, approver_id: approverId, reason }),

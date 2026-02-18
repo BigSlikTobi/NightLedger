@@ -123,6 +123,7 @@ def test_get_pending_approvals_returns_unresolved_pending_events() -> None:
     assert len(body["approvals"]) == 1
     assert body["approvals"][0] == {
         "event_id": "evt_pending_1",
+        "decision_id": None,
         "run_id": "run_pending_1",
         "requested_at": "2026-02-16T09:00:00Z",
         "requested_by": "agent",
@@ -653,6 +654,12 @@ def test_issue46_round1_registers_pending_approval_by_decision_id() -> None:
     assert body["run_id"] == "run_issue46_round1"
     assert body["approval_status"] == "pending"
     assert isinstance(body["event_id"], str) and body["event_id"]
+
+    pending = client.get("/v1/approvals/pending")
+    assert pending.status_code == 200
+    pending_body = pending.json()
+    assert pending_body["pending_count"] == 1
+    assert pending_body["approvals"][0]["decision_id"] == "dec_issue46_round1"
 
 
 def test_issue46_round2_resolves_pending_approval_by_decision_id() -> None:
