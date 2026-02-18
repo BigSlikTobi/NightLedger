@@ -28,6 +28,7 @@ def _authorize_payload(amount: int) -> dict[str, object]:
             "request_id": f"req_{amount}",
             "amount": amount,
             "currency": "EUR",
+            "merchant": "ACME GmbH",
         },
     }
 
@@ -43,7 +44,7 @@ def _exec_payload() -> dict[str, object]:
 
 
 def test_authorize_action_allow_returns_execution_token(monkeypatch) -> None:
-    monkeypatch.setenv("NIGHTLEDGER_EXECUTION_TOKEN_SECRET", "round4-secret")
+    monkeypatch.setenv("NIGHTLEDGER_EXECUTION_TOKEN_SECRET", "round4-secret-key-material-32bytes!!")
 
     response = client.post("/v1/mcp/authorize_action", json=_authorize_payload(100))
 
@@ -83,7 +84,10 @@ def test_mint_execution_token_by_decision_id_requires_approved_state() -> None:
     )
     assert register.status_code == 200
 
-    response = client.post("/v1/approvals/decisions/dec_round4_pending/execution-token")
+    response = client.post(
+        "/v1/approvals/decisions/dec_round4_pending/execution-token",
+        json={"amount": 100, "currency": "EUR", "merchant": "ACME GmbH"},
+    )
 
     assert response.status_code == 409
     body = response.json()
@@ -92,7 +96,7 @@ def test_mint_execution_token_by_decision_id_requires_approved_state() -> None:
 
 
 def test_mint_execution_token_by_decision_id_succeeds_when_approved(monkeypatch) -> None:
-    monkeypatch.setenv("NIGHTLEDGER_EXECUTION_TOKEN_SECRET", "round4-secret")
+    monkeypatch.setenv("NIGHTLEDGER_EXECUTION_TOKEN_SECRET", "round4-secret-key-material-32bytes!!")
     store = InMemoryAppendOnlyEventStore()
     app.dependency_overrides[get_event_store] = lambda: store
 
@@ -116,7 +120,10 @@ def test_mint_execution_token_by_decision_id_succeeds_when_approved(monkeypatch)
     )
     assert resolve.status_code == 200
 
-    response = client.post("/v1/approvals/decisions/dec_round4_approved/execution-token")
+    response = client.post(
+        "/v1/approvals/decisions/dec_round4_approved/execution-token",
+        json={"amount": 100, "currency": "EUR", "merchant": "ACME GmbH"},
+    )
 
     assert response.status_code == 200
     body = response.json()
@@ -128,7 +135,7 @@ def test_mint_execution_token_by_decision_id_succeeds_when_approved(monkeypatch)
 
 
 def test_purchase_executor_rejects_replayed_token(monkeypatch) -> None:
-    monkeypatch.setenv("NIGHTLEDGER_EXECUTION_TOKEN_SECRET", "round4-secret")
+    monkeypatch.setenv("NIGHTLEDGER_EXECUTION_TOKEN_SECRET", "round4-secret-key-material-32bytes!!")
 
     authorize = client.post("/v1/mcp/authorize_action", json=_authorize_payload(100))
     assert authorize.status_code == 200
