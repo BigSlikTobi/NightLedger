@@ -33,9 +33,14 @@ from nightledger_api.services.errors import (
     SchemaValidationError,
     StorageReadError,
     StorageWriteError,
+    ExecutionDecisionNotApprovedError,
     ExecutionTokenMissingError,
+    ExecutionTokenReplayedError,
 )
-from nightledger_api.services.execution_token_service import verify_execution_token
+from nightledger_api.services.execution_token_service import (
+    mint_execution_token,
+    verify_execution_token,
+)
 from nightledger_api.services.journal_projection_service import project_run_journal
 from nightledger_api.services.run_status_service import project_run_status
 
@@ -46,6 +51,7 @@ logger = logging.getLogger(__name__)
 uvicorn_logger = logging.getLogger("uvicorn.error")
 logger.setLevel(logging.INFO)
 uvicorn_logger.setLevel(logging.INFO)
+_used_execution_token_jtis: set[str] = set()
 
 
 class ApprovalDecisionRequest(BaseModel):
@@ -268,8 +274,20 @@ def _log_structured(level: int, payload: dict[str, Any], *, exc_info: bool = Fal
 
 
 @router.post("/v1/mcp/authorize_action", status_code=status.HTTP_200_OK)
-def authorize_action(payload: AuthorizeActionRequest) -> dict[str, str]:
-    return evaluate_authorize_action(payload=payload)
+def authorize_action(payload: AuthorizeActionRequest) -> dict[str, Any]:
+    decision = evaluate_authorize_action(payload=payload)
+    if decision["state"] != "allow":
+        return decision
+
+    token, expires_at = mint_execution_token(
+        decision_id=decision["decision_id"],
+        action=payload.intent.action,
+    )
+    return {
+        **decision,
+        "execution_token": token,
+        "execution_token_expires_at": expires_at,
+    }
 
 
 @router.post("/v1/events", status_code=status.HTTP_201_CREATED)
@@ -515,12 +533,38 @@ def execute_purchase_create(
         token=token,
         expected_action="purchase.create",
     )
+    jti = str(claims["jti"])
+    if jti in _used_execution_token_jtis:
+        raise ExecutionTokenReplayedError()
+    _used_execution_token_jtis.add(jti)
+
     return {
         "status": "executed",
         "action": "purchase.create",
         "decision_id": claims["decision_id"],
         "execution_id": f"exec_{uuid4().hex[:16]}",
         "executed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+
+
+@router.post("/v1/approvals/decisions/{decision_id}/execution-token", status_code=status.HTTP_200_OK)
+def mint_execution_token_for_decision(
+    decision_id: str,
+    store: EventStore = Depends(get_event_store),
+) -> dict[str, Any]:
+    state = get_approval_decision_state(store=store, decision_id=decision_id)
+    if state["status"] != "approved":
+        raise ExecutionDecisionNotApprovedError(decision_id=decision_id)
+
+    token, expires_at = mint_execution_token(
+        decision_id=decision_id,
+        action="purchase.create",
+    )
+    return {
+        "decision_id": decision_id,
+        "action": "purchase.create",
+        "execution_token": token,
+        "expires_at": expires_at,
     }
 
 
