@@ -627,3 +627,29 @@ def test_post_approval_logs_structured_completion_to_uvicorn_logger(caplog) -> N
         and '"approver_id": "human_reviewer"' in record.message
         for record in caplog.records
     )
+
+
+def test_issue46_round1_registers_pending_approval_by_decision_id() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round1",
+            "run_id": "run_issue46_round1",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "registered"
+    assert body["decision_id"] == "dec_issue46_round1"
+    assert body["run_id"] == "run_issue46_round1"
+    assert body["approval_status"] == "pending"
+    assert isinstance(body["event_id"], str) and body["event_id"]

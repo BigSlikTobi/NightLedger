@@ -5,7 +5,11 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from nightledger_api.services.approval_service import list_pending_approvals, resolve_pending_approval
+from nightledger_api.services.approval_service import (
+    list_pending_approvals,
+    register_pending_approval_request,
+    resolve_pending_approval,
+)
 from nightledger_api.services.authorize_action_service import (
     AuthorizeActionRequest,
     evaluate_authorize_action,
@@ -43,6 +47,18 @@ class ApprovalDecisionRequest(BaseModel):
 
     decision: Literal["approved", "rejected"]
     approver_id: str = Field(min_length=1)
+    reason: str | None = None
+
+
+class ApprovalRequestRegistrationPayload(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    decision_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    requested_by: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    details: str = Field(min_length=1)
+    risk_level: Literal["low", "medium", "high"]
     reason: str | None = None
 
 
@@ -339,6 +355,28 @@ def get_pending_approvals(store: EventStore = Depends(get_event_store)) -> dict[
     try:
         return list_pending_approvals(store)
     except (StorageReadError, InconsistentRunStateError):
+        raise
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise StorageReadError("storage backend read failed") from exc
+
+
+@router.post("/v1/approvals/requests", status_code=status.HTTP_200_OK)
+def register_approval_request(
+    payload: ApprovalRequestRegistrationPayload,
+    store: EventStore = Depends(get_event_store),
+) -> dict[str, Any]:
+    try:
+        return register_pending_approval_request(
+            store=store,
+            decision_id=payload.decision_id,
+            run_id=payload.run_id,
+            requested_by=payload.requested_by,
+            title=payload.title,
+            details=payload.details,
+            risk_level=payload.risk_level,
+            reason=payload.reason,
+        )
+    except (StorageReadError, StorageWriteError):
         raise
     except Exception as exc:  # pragma: no cover - defensive wrapper
         raise StorageReadError("storage backend read failed") from exc

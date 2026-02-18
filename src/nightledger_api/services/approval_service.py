@@ -62,6 +62,66 @@ def list_pending_approvals(store: EventStore) -> dict[str, Any]:
     return {"pending_count": len(approvals), "approvals": approvals}
 
 
+def register_pending_approval_request(
+    *,
+    store: EventStore,
+    decision_id: str,
+    run_id: str,
+    requested_by: str,
+    title: str,
+    details: str,
+    risk_level: Literal["low", "medium", "high"],
+    reason: str | None,
+) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    run_events = store.list_by_run_id(run_id)
+    if run_events:
+        latest_run_timestamp = max(event.timestamp for event in run_events)
+        if now <= latest_run_timestamp:
+            now = latest_run_timestamp + timedelta(milliseconds=1)
+
+    requested_at = _format_timestamp(now)
+    event_id = _build_decision_pending_event_id(decision_id=decision_id, timestamp=requested_at)
+    payload = validate_event_payload(
+        {
+            "id": event_id,
+            "run_id": run_id,
+            "timestamp": requested_at,
+            "type": "approval_requested",
+            "actor": "agent",
+            "title": title,
+            "details": details,
+            "confidence": None,
+            "risk_level": risk_level,
+            "requires_approval": True,
+            "approval": {
+                "status": "pending",
+                "decision_id": decision_id,
+                "requested_by": requested_by,
+                "resolved_by": None,
+                "resolved_at": None,
+                "reason": reason,
+            },
+            "evidence": [],
+            "meta": {"workflow": "approval_gate", "step": "approval_requested"},
+        }
+    )
+    try:
+        stored = store.append(payload)
+    except StorageWriteError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise StorageWriteError("storage backend append failed") from exc
+
+    return {
+        "status": "registered",
+        "decision_id": decision_id,
+        "event_id": stored.id,
+        "run_id": run_id,
+        "approval_status": "pending",
+    }
+
+
 def resolve_pending_approval(
     *,
     store: EventStore,
@@ -413,6 +473,12 @@ def _build_resolution_event_id(
     compact_time = timestamp.replace("-", "").replace(":", "").replace(".", "")
     compact_time = compact_time.replace("T", "T").replace("Z", "Z")
     return f"apr_{target_event_id}_{decision}_{compact_time}_{uuid4().hex[:8]}"
+
+
+def _build_decision_pending_event_id(*, decision_id: str, timestamp: str) -> str:
+    compact_time = timestamp.replace("-", "").replace(":", "").replace(".", "")
+    compact_time = compact_time.replace("T", "T").replace("Z", "Z")
+    return f"evt_{decision_id}_pending_{compact_time}_{uuid4().hex[:8]}"
 
 
 def _format_timestamp(value: datetime) -> str:
