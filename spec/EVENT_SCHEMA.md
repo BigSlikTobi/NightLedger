@@ -42,6 +42,8 @@ Optional fields:
 - `title` and `details` must be non-empty strings.
 - `approval.status` must be one of
   `not_required|pending|approved|rejected`.
+- `approval.decision_id` is optional and may be used to link
+  `authorize_action` decisions to approval lifecycle receipts.
 - `evidence[*].kind` must be one of `log|url|artifact|diff`.
 
 ## JSON Shape
@@ -60,6 +62,7 @@ Optional fields:
   "requires_approval": false,
   "approval": {
     "status": "not_required|pending|approved|rejected",
+    "decision_id": "dec_...",
     "requested_by": "agent",
     "resolved_by": "human_id",
     "resolved_at": null,
