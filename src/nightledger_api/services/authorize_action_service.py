@@ -1,4 +1,5 @@
 import json
+import os
 from hashlib import sha256
 from typing import Any, Literal
 
@@ -6,6 +7,8 @@ from pydantic import BaseModel, ConfigDict
 
 
 AuthorizeActionState = Literal["allow", "requires_approval", "deny"]
+_DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR = 100.0
+_PURCHASE_APPROVAL_THRESHOLD_ENV = "NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR"
 
 
 class AuthorizeActionIntent(BaseModel):
@@ -17,6 +20,8 @@ class AuthorizeActionIntent(BaseModel):
 class AuthorizeActionContext(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="allow")
 
+    amount: float
+    currency: Literal["EUR"]
     transport_decision_hint: AuthorizeActionState | None = None
 
 
@@ -28,7 +33,12 @@ class AuthorizeActionRequest(BaseModel):
 
 
 def evaluate_authorize_action(payload: AuthorizeActionRequest) -> dict[str, str]:
-    state = payload.context.transport_decision_hint or "allow"
+    threshold = _configured_threshold_eur()
+    state: AuthorizeActionState = (
+        "requires_approval"
+        if payload.context.amount > threshold
+        else "allow"
+    )
     return {
         "decision_id": _build_deterministic_decision_id(payload=payload),
         "state": state,
@@ -49,8 +59,21 @@ def _build_deterministic_decision_id(*, payload: AuthorizeActionRequest) -> str:
 
 def _reason_code_for_state(*, state: AuthorizeActionState) -> str:
     mapping = {
-        "allow": "TRANSPORT_CONTRACT_ACCEPTED",
-        "requires_approval": "TRANSPORT_REQUIRES_APPROVAL",
-        "deny": "TRANSPORT_DENIED",
+        "allow": "POLICY_ALLOW_WITHIN_THRESHOLD",
+        "requires_approval": "AMOUNT_ABOVE_THRESHOLD",
+        "deny": "POLICY_DENIED",
     }
     return mapping[state]
+
+
+def _configured_threshold_eur() -> float:
+    configured = os.getenv(_PURCHASE_APPROVAL_THRESHOLD_ENV)
+    if configured is None:
+        return _DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR
+    # Treat empty or invalid values as misconfiguration and fall back to default
+    try:
+        if configured.strip() == "":
+            return _DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR
+        return float(configured)
+    except ValueError:
+        return _DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR

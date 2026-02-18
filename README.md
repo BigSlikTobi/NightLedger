@@ -81,40 +81,38 @@ Endpoint:
 POST /v1/mcp/authorize_action
 ```
 
-Allow response (default transport behavior):
+Policy rule (Issue #45 sub-issue 1):
+
+- `context.amount` and `context.currency` are required policy inputs.
+- Default threshold: `100` EUR (override with
+  `NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR`).
+- `amount <= threshold` => `allow`
+- `amount > threshold` => `requires_approval`
+- `transport_decision_hint` (`allow|requires_approval|deny`) is accepted for
+  backward compatibility but does not override policy outcome.
+
+Allow response (`amount` at threshold):
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_allow","transport_decision_hint":"allow"}}'
+  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_allow","amount":100,"currency":"EUR","transport_decision_hint":"deny"}}'
 ```
 
 ```json
-{"decision_id":"dec_...","state":"allow","reason_code":"TRANSPORT_CONTRACT_ACCEPTED"}
+{"decision_id":"dec_...","state":"allow","reason_code":"POLICY_ALLOW_WITHIN_THRESHOLD"}
 ```
 
-Requires approval response:
+Requires approval response (`amount` above threshold):
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_pause","transport_decision_hint":"requires_approval"}}'
+  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_pause","amount":101,"currency":"EUR","transport_decision_hint":"allow"}}'
 ```
 
 ```json
-{"decision_id":"dec_...","state":"requires_approval","reason_code":"TRANSPORT_REQUIRES_APPROVAL"}
-```
-
-Deny response:
-
-```bash
-curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
-  -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_deny","transport_decision_hint":"deny"}}'
-```
-
-```json
-{"decision_id":"dec_...","state":"deny","reason_code":"TRANSPORT_DENIED"}
+{"decision_id":"dec_...","state":"requires_approval","reason_code":"AMOUNT_ABOVE_THRESHOLD"}
 ```
 
 Invalid payload example (`intent.action` not supported):
@@ -122,7 +120,7 @@ Invalid payload example (`intent.action` not supported):
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"transfer.create"},"context":{"request_id":"req_invalid"}}'
+  -d '{"intent":{"action":"transfer.create"},"context":{"request_id":"req_invalid","amount":50,"currency":"EUR"}}'
 ```
 
 ```json
@@ -139,3 +137,41 @@ PYTHONPATH=src ./.venv/bin/python -m nightledger_api.mcp_server
 
 The wrapper exposes one MCP tool, `authorize_action`, backed by the same
 deterministic contract used by `POST /v1/mcp/authorize_action`.
+
+## Policy Threshold Operator Flow (Issue #45)
+
+Use terminal requests for policy evaluation and keep UI focused on approval
+state projection.
+
+1) Start API with threshold `100`:
+
+```bash
+NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR=100 \
+PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --port 8001
+```
+
+2) Send policy decision requests:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
+  -H "Content-Type: application/json" \
+  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_120","amount":120,"currency":"EUR"}}'
+```
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
+  -H "Content-Type: application/json" \
+  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_80","amount":80,"currency":"EUR"}}'
+```
+
+3) Inspect pending approvals (UI reads from this endpoint):
+
+```bash
+curl -sS http://127.0.0.1:8001/v1/approvals/pending
+```
+
+Notes:
+- `authorize_action` returns decisions; it does not append timeline receipts by
+  itself.
+- To visualize custom scenarios in live UI/journal, append matching
+  `approval_requested` or `action` events via `POST /v1/events`.
