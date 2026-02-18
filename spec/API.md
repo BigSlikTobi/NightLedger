@@ -1043,6 +1043,19 @@ Behavior:
 
 Mint a short-lived execution token for `purchase.create`.
 
+Request payload:
+
+```json
+{
+  "amount": 500,
+  "currency": "EUR",
+  "merchant": "ACME GmbH"
+}
+```
+
+`execution_token` is payload-bound to these fields and cannot be reused with a
+different request body.
+
 Behavior:
 
 - `200 OK` when approval decision status is `approved`.
@@ -1078,6 +1091,13 @@ Behavior:
   - `EXECUTION_TOKEN_EXPIRED`
   - `EXECUTION_TOKEN_REPLAYED`
   - `EXECUTION_ACTION_MISMATCH`
+  - `EXECUTION_PAYLOAD_MISMATCH`
+
+Token hardening notes:
+
+- Tokens include `kid` and support key-rotation verification.
+- Runtime validates payload binding hash before execution.
+- Replay protection is durable via SQLite-backed `jti` consumption ledger.
 
 Success response:
 

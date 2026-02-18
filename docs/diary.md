@@ -1964,3 +1964,37 @@ invalid, expired, tampered, and replayed tokens.
 - Issue #47 is closed at runtime enforcement boundary level.
 - Remaining gaps are explicitly documented in
   `docs/artifacts/issue-47/gap_assessment.md` for #48/#49/#75/#76.
+
+---
+
+## 🗓️ 2026-02-18: Issue #47 Hardening Pass — Key Rotation, Payload Binding, Durable Replay
+
+### Objective
+
+Harden execution token security posture beyond baseline #47 enforcement by
+adding key-rotation support, stronger secret requirements, payload binding, and
+durable replay protection.
+
+### What changed
+
+- Added `kid` support to token claims with key-map verification.
+- Added strict secret-strength validation (minimum 32 chars).
+- Added payload-hash binding and verification for purchase execution requests.
+- Added durable replay protection using SQLite-backed consumed `jti` ledger.
+- Added new error codes:
+  - `EXECUTION_PAYLOAD_MISMATCH`
+  - `EXECUTION_TOKEN_MISCONFIGURED`
+
+### Validation evidence
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_execution_token_service.py tests/test_purchase_executor_api.py tests/test_execution_token_integration_api.py tests/test_issue47_end_to_end_api.py`
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+- `cd apps/web && node --test model/*.test.js controller/*.test.js view/*.test.js`
+
+### Findings
+
+- Token misuse is significantly harder: stolen token cannot execute with altered
+  payload and cannot be replayed after first use.
+- Runtime now supports safe key rotation via `kid` lookup.
+- Remaining future hardening (outside this pass): managed KMS integration and
+  clustered replay-store backend.

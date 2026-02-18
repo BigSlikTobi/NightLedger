@@ -196,7 +196,8 @@ NightLedger enforces a hard runtime trust boundary for `purchase.create`.
    `POST /v1/mcp/authorize_action` returns `allow` or `requires_approval`.
 2. Approval token minting:
    `POST /v1/approvals/decisions/{decision_id}/execution-token` returns a short-lived
-   `execution_token` only when the decision is approved.
+   `execution_token` only when the decision is approved and binds token to the
+   requested purchase payload (`amount`, `currency`, `merchant`).
 3. Protected execution:
    `POST /v1/executors/purchase.create` requires
    `Authorization: Bearer <execution_token>`.
@@ -211,12 +212,21 @@ Fail-closed behavior:
 Token mint and execution examples:
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8001/v1/approvals/decisions/dec_123/execution-token
+curl -sS -X POST http://127.0.0.1:8001/v1/approvals/decisions/dec_123/execution-token \
+  -H "Content-Type: application/json" \
+  -d '{"amount":500,"currency":"EUR","merchant":"ACME GmbH"}'
 ```
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/executors/purchase.create \
   -H "Authorization: Bearer <signed-token>" \
   -H "Content-Type: application/json" \
-  -d '{"amount":100,"currency":"EUR","merchant":"ACME GmbH"}'
+  -d '{"amount":500,"currency":"EUR","merchant":"ACME GmbH"}'
 ```
+
+Security runtime config:
+
+- `NIGHTLEDGER_EXECUTION_TOKEN_SECRET`: signing secret (legacy single-key mode)
+- `NIGHTLEDGER_EXECUTION_TOKEN_KEYS`: comma-separated `kid:secret` keyring
+- `NIGHTLEDGER_EXECUTION_TOKEN_ACTIVE_KID`: active key identifier for minting
+- `NIGHTLEDGER_EXECUTION_TOKEN_REPLAY_DB_PATH`: durable replay store path
