@@ -31,6 +31,45 @@ Request payload:
 }
 ```
 
+## MCP stdio server: `authorize_action` tool
+
+NightLedger also exposes the same transport contract through a local MCP stdio
+server wrapper.
+
+Supported MCP methods:
+
+- `initialize`
+- `notifications/initialized`
+- `tools/list`
+- `tools/call`
+
+Tool name:
+
+- `authorize_action`
+
+Tool arguments:
+
+```json
+{
+  "intent": {
+    "action": "purchase.create"
+  },
+  "context": {
+    "request_id": "req_123",
+    "transport_decision_hint": "allow"
+  }
+}
+```
+
+Tool result (`tools/call`):
+
+- `structuredContent` carries the decision object with:
+  - `decision_id`
+  - `state`
+  - `reason_code`
+- `isError=true` for invalid arguments, with a structured NightLedger error
+  envelope in the response content and `structuredContent`.
+
 Success responses:
 
 `allow` (default when hint is omitted):

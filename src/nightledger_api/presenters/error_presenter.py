@@ -251,14 +251,21 @@ def present_approval_request_validation_error(
 def present_authorize_action_request_validation_error(
     exc: RequestValidationError,
 ) -> dict[str, Any]:
+    return present_authorize_action_validation_errors(exc.errors())
+
+
+def present_authorize_action_validation_errors(
+    errors: list[dict[str, Any]],
+) -> dict[str, Any]:
     details: list[dict[str, str]] = []
 
-    for error in exc.errors():
+    for error in errors:
         loc = error.get("loc", ())
-        if len(loc) < 2 or loc[0] != "body":
+        if len(loc) < 1:
             continue
 
-        path = ".".join(str(part) for part in loc[1:])
+        start_index = 1 if str(loc[0]) == "body" else 0
+        path = ".".join(str(part) for part in loc[start_index:])
         details.append(
             {
                 "path": path,

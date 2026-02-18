@@ -128,3 +128,14 @@ curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
 ```json
 {"error":{"code":"REQUEST_VALIDATION_ERROR","details":[{"path":"intent.action","code":"UNSUPPORTED_ACTION"}]}}
 ```
+
+### MCP stdio server wrapper
+
+Run the MCP wrapper on stdio:
+
+```bash
+PYTHONPATH=src ./.venv/bin/python -m nightledger_api.mcp_server
+```
+
+The wrapper exposes one MCP tool, `authorize_action`, backed by the same
+deterministic contract used by `POST /v1/mcp/authorize_action`.

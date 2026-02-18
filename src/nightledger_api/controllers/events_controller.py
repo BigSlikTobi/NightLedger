@@ -1,12 +1,15 @@
 import json
 import logging
-from hashlib import sha256
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from nightledger_api.services.approval_service import list_pending_approvals, resolve_pending_approval
+from nightledger_api.services.authorize_action_service import (
+    AuthorizeActionRequest,
+    evaluate_authorize_action,
+)
 from nightledger_api.services.business_rules_service import validate_event_business_rules
 from nightledger_api.services.event_ingest_service import validate_event_payload
 from nightledger_api.services.event_store import EventStore, InMemoryAppendOnlyEventStore
@@ -41,25 +44,6 @@ class ApprovalDecisionRequest(BaseModel):
     decision: Literal["approved", "rejected"]
     approver_id: str = Field(min_length=1)
     reason: str | None = None
-
-
-class AuthorizeActionIntent(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-
-    action: Literal["purchase.create"]
-
-
-class AuthorizeActionContext(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="allow")
-
-    transport_decision_hint: Literal["allow", "requires_approval", "deny"] | None = None
-
-
-class AuthorizeActionRequest(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-
-    intent: AuthorizeActionIntent
-    context: AuthorizeActionContext
 
 
 def get_event_store() -> EventStore:
@@ -255,33 +239,7 @@ def _log_structured(level: int, payload: dict[str, Any], *, exc_info: bool = Fal
 
 @router.post("/v1/mcp/authorize_action", status_code=status.HTTP_200_OK)
 def authorize_action(payload: AuthorizeActionRequest) -> dict[str, str]:
-    state = payload.context.transport_decision_hint or "allow"
-    decision_id = _build_deterministic_decision_id(payload=payload)
-    return {
-        "decision_id": decision_id,
-        "state": state,
-        "reason_code": _reason_code_for_state(state=state),
-    }
-
-
-def _build_deterministic_decision_id(*, payload: AuthorizeActionRequest) -> str:
-    canonical_payload = {
-        "intent": payload.intent.model_dump(mode="json"),
-        "context": payload.context.model_dump(mode="json", exclude_none=True),
-    }
-    fingerprint = sha256(
-        json.dumps(canonical_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
-    return f"dec_{fingerprint[:16]}"
-
-
-def _reason_code_for_state(*, state: str) -> str:
-    mapping = {
-        "allow": "TRANSPORT_CONTRACT_ACCEPTED",
-        "requires_approval": "TRANSPORT_REQUIRES_APPROVAL",
-        "deny": "TRANSPORT_DENIED",
-    }
-    return mapping[state]
+    return evaluate_authorize_action(payload=payload)
 
 
 @router.post("/v1/events", status_code=status.HTTP_201_CREATED)

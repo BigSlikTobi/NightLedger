@@ -8,6 +8,29 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #44 — sub-issue 4 MCP stdio server wrapper
+
+### Summary
+
+Implemented a shippable MCP stdio server wrapper at
+`src/nightledger_api/mcp_server.py` so agent clients can call NightLedger via
+MCP instead of HTTP-only transport. The server now supports `initialize`,
+`notifications/initialized`, `tools/list`, and `tools/call`, and exposes one
+tool: `authorize_action`. Tool calls reuse the same deterministic
+authorize-action service used by the HTTP endpoint, including decision states
+(`allow`, `requires_approval`, `deny`), deterministic `decision_id`, and
+structured validation envelopes for invalid arguments. The authorize-action
+contract logic was moved to a shared service to keep HTTP and MCP behavior in
+lockstep.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_mcp_stdio_server.py`
+- `./.venv/bin/pytest -q tests/test_mcp_authorize_action_api.py`
+- `./.venv/bin/pytest -q tests/test_issue44_mcp_authorize_action_docs.py`
+- `./.venv/bin/pytest -q`
+- `node --test model/*.test.js controller/*.test.js view/*.test.js`
+
 ## 🗓️ 2026-02-18: Issue #44 — sub-issues 2 and 3 decision states + operator docs
 
 ### Summary

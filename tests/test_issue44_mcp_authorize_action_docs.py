@@ -21,6 +21,8 @@ def test_issue44_readme_includes_mcp_authorize_action_examples() -> None:
     assert '"state":"deny"' in readme
     assert '"code":"REQUEST_VALIDATION_ERROR"' in readme
     assert '"code":"UNSUPPORTED_ACTION"' in readme
+    assert "### MCP stdio server wrapper" in readme
+    assert "python -m nightledger_api.mcp_server" in readme
 
 
 def test_issue44_api_spec_documents_decision_hint_defaults_and_error_code() -> None:
@@ -32,3 +34,6 @@ def test_issue44_api_spec_documents_decision_hint_defaults_and_error_code() -> N
     assert '"state": "requires_approval"' in api_spec
     assert '"state": "deny"' in api_spec
     assert '"code": "INVALID_TRANSPORT_DECISION_HINT"' in api_spec
+    assert "## MCP stdio server: `authorize_action` tool" in api_spec
+    assert "- `tools/call`" in api_spec
+    assert "structuredContent" in api_spec
