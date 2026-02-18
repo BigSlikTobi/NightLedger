@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from nightledger_api.services.approval_service import (
+    get_approval_decision_state,
     list_pending_approvals,
     register_pending_approval_request,
     resolve_pending_approval_by_decision_id,
@@ -470,6 +471,22 @@ def resolve_approval_by_decision_id(
             approver_id=payload.approver_id,
             exc=exc,
         )
+        raise
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise StorageReadError("storage backend read failed") from exc
+
+
+@router.get("/v1/approvals/decisions/{decision_id}", status_code=status.HTTP_200_OK)
+def get_approval_by_decision_id(
+    decision_id: str,
+    store: EventStore = Depends(get_event_store),
+) -> dict[str, Any]:
+    try:
+        return get_approval_decision_state(store=store, decision_id=decision_id)
+    except (
+        StorageReadError,
+        ApprovalNotFoundError,
+    ):
         raise
     except Exception as exc:  # pragma: no cover - defensive wrapper
         raise StorageReadError("storage backend read failed") from exc

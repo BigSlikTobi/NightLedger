@@ -201,6 +201,45 @@ def resolve_pending_approval_by_decision_id(
     return result
 
 
+def get_approval_decision_state(*, store: EventStore, decision_id: str) -> dict[str, Any]:
+    decision_events = [
+        event
+        for event in store.list_all()
+        if event.payload.get("approval", {}).get("decision_id") == decision_id
+    ]
+    if not decision_events:
+        raise ApprovalNotFoundError(event_id=decision_id)
+
+    requested_event: StoredEvent | None = None
+    resolved_event: StoredEvent | None = None
+    for event in decision_events:
+        if _is_pending_signal(event) and requested_event is None:
+            requested_event = event
+        if _is_resolution_signal(event):
+            resolved_event = event
+
+    anchor_event = resolved_event or requested_event or decision_events[-1]
+    approval_payload = anchor_event.payload.get("approval", {})
+    status = approval_payload.get("status")
+
+    return {
+        "decision_id": decision_id,
+        "run_id": anchor_event.run_id,
+        "status": status,
+        "requested_event_id": requested_event.id if requested_event is not None else None,
+        "resolved_event_id": resolved_event.id if resolved_event is not None else None,
+        "requested_at": _format_timestamp(requested_event.timestamp) if requested_event is not None else None,
+        "resolved_at": approval_payload.get("resolved_at"),
+        "requested_by": (
+            requested_event.payload.get("approval", {}).get("requested_by")
+            if requested_event is not None
+            else None
+        ),
+        "resolved_by": approval_payload.get("resolved_by"),
+        "reason": approval_payload.get("reason"),
+    }
+
+
 def _append_resolution_event(
     *,
     store: EventStore,
