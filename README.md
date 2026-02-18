@@ -138,6 +138,141 @@ PYTHONPATH=src ./.venv/bin/python -m nightledger_api.mcp_server
 The wrapper exposes one MCP tool, `authorize_action`, backed by the same
 deterministic contract used by `POST /v1/mcp/authorize_action`.
 
+### MCP remote server wrapper
+
+Use this when your MCP client is on a different machine than NightLedger.
+
+server machine:
+
+```bash
+NIGHTLEDGER_MCP_REMOTE_AUTH_TOKEN=replace-with-strong-token \
+NIGHTLEDGER_MCP_REMOTE_ALLOWED_ORIGINS=https://trusted-client.example \
+NIGHTLEDGER_MCP_REMOTE_AUTHORIZATION_SERVERS=https://auth.example \
+PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.mcp_remote_server:app --host 0.0.0.0 --port 8002
+```
+
+client machine:
+
+```bash
+curl -sS -X POST http://<server-ip>:8002/v1/mcp/remote \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer replace-with-strong-token" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"remote-client","version":"0.1.0"}}}'
+```
+
+Initialization response includes `MCP-Session-Id`. Reuse it for all subsequent
+transport calls together with `MCP-Protocol-Version: 2025-06-18`.
+
+Validate tool exposure:
+
+```bash
+curl -sS -X POST http://<server-ip>:8002/v1/mcp/remote \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer replace-with-strong-token" \
+  -H "MCP-Session-Id: <session-id-from-initialize>" \
+  -H "MCP-Protocol-Version: 2025-06-18" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+```
+
+Validate remote policy decision:
+
+```bash
+curl -sS -X POST http://<server-ip>:8002/v1/mcp/remote \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer replace-with-strong-token" \
+  -H "MCP-Session-Id: <session-id-from-initialize>" \
+  -H "MCP-Protocol-Version: 2025-06-18" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"authorize_action","arguments":{"intent":{"action":"purchase.create"},"context":{"request_id":"req_remote_1","amount":101,"currency":"EUR"}}}}'
+```
+
+Open server-sent event stream for async notifications:
+
+```bash
+curl -N -sS http://<server-ip>:8002/v1/mcp/remote \
+  -H "Accept: text/event-stream" \
+  -H "Authorization: Bearer replace-with-strong-token" \
+  -H "MCP-Session-Id: <session-id-from-initialize>" \
+  -H "MCP-Protocol-Version: 2025-06-18"
+```
+
+Close the remote MCP session:
+
+```bash
+curl -sS -X DELETE http://<server-ip>:8002/v1/mcp/remote \
+  -H "Authorization: Bearer replace-with-strong-token" \
+  -H "MCP-Session-Id: <session-id-from-initialize>" \
+  -H "MCP-Protocol-Version: 2025-06-18"
+```
+
+Inspect OAuth protected-resource metadata:
+
+```bash
+curl -sS http://<server-ip>:8002/.well-known/oauth-protected-resource
+```
+
+Token auth options:
+
+- `Authorization: Bearer <token>`
+- `X-API-Key: <token>`
+
+### Bot MCP config examples
+
+Use these as templates for agent runtimes that support HTTP MCP servers.
+
+Generic remote MCP server config:
+
+```json
+{
+  "name": "nightledger-remote",
+  "transport": {
+    "type": "http",
+    "url": "http://<server-ip>:8002/v1/mcp/remote",
+    "headers": {
+      "Authorization": "Bearer <token>",
+      "Accept": "application/json"
+    }
+  },
+  "protocolVersion": "2025-06-18"
+}
+```
+
+If your client supports explicit session header persistence between calls, keep:
+
+```json
+{
+  "sessionHeaders": {
+    "MCP-Session-Id": "<value-returned-by-initialize>",
+    "MCP-Protocol-Version": "2025-06-18"
+  }
+}
+```
+
+For clients that support SSE stream subscriptions, configure:
+
+```json
+{
+  "stream": {
+    "method": "GET",
+    "url": "http://<server-ip>:8002/v1/mcp/remote",
+    "headers": {
+      "Authorization": "Bearer <token>",
+      "Accept": "text/event-stream",
+      "MCP-Session-Id": "<session-id>",
+      "MCP-Protocol-Version": "2025-06-18"
+    }
+  }
+}
+```
+
+OAuth metadata discovery endpoint (if your bot platform supports it):
+
+```text
+http://<server-ip>:8002/.well-known/oauth-protected-resource
+```
+
 ## Policy Threshold Operator Flow (Issue #45)
 
 Use terminal requests for policy evaluation and keep UI focused on approval
