@@ -70,9 +70,13 @@ class InconsistentRunStateError(Exception):
 
 
 class ApprovalNotFoundError(Exception):
-    def __init__(self, event_id: str) -> None:
+    def __init__(self, event_id: str, *, detail_path: str = "event_id") -> None:
         self.event_id = event_id
-        super().__init__(f"Approval target event '{event_id}' was not found")
+        self.detail_path = detail_path
+        if detail_path == "decision_id":
+            super().__init__(f"Approval decision '{event_id}' was not found")
+        else:
+            super().__init__(f"Approval target event '{event_id}' was not found")
 
 
 class AmbiguousEventIdError(Exception):
@@ -88,6 +92,25 @@ class NoPendingApprovalError(Exception):
 
 
 class DuplicateApprovalError(Exception):
-    def __init__(self, event_id: str) -> None:
+    def __init__(
+        self,
+        event_id: str,
+        *,
+        detail_path: str = "event_id",
+        reason: str = "resolved",
+    ) -> None:
         self.event_id = event_id
-        super().__init__(f"Approval for event '{event_id}' has already been resolved")
+        self.detail_path = detail_path
+        self.reason = reason
+        if detail_path == "decision_id" and reason == "pending":
+            super().__init__(f"Approval for decision '{event_id}' is already pending")
+        elif detail_path == "decision_id" and reason == "exists":
+            super().__init__(f"Approval for decision '{event_id}' already exists")
+        elif detail_path == "decision_id":
+            super().__init__(f"Approval for decision '{event_id}' has already been resolved")
+        elif reason == "pending":
+            super().__init__(f"Approval for event '{event_id}' is already pending")
+        elif reason == "exists":
+            super().__init__(f"Approval for event '{event_id}' already exists")
+        else:
+            super().__init__(f"Approval for event '{event_id}' has already been resolved")

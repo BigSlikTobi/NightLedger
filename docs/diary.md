@@ -8,6 +8,63 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #46 — decision_id approval flow v1 (5-Round cycle)
+
+### Summary
+
+Implemented issue `#46` decision-centered approval lifecycle while preserving
+legacy `event_id` compatibility. Added:
+
+- `POST /v1/approvals/requests` for pending registration by `decision_id`
+- `POST /v1/approvals/decisions/{decision_id}` for human approve/reject
+- `GET /v1/approvals/decisions/{decision_id}` for deterministic lifecycle query
+
+Also extended schema/contracts with `approval.decision_id`, enforced
+decision-id consistency in governance (`RULE-GATE-011`), and added closure
+artifacts in `docs/artifacts/issue-46/`.
+
+### 🔁 The 5-Round Process (Human-readable)
+
+1. **Round 1 — Registration contract gap**
+   - Failing test added for `POST /v1/approvals/requests`.
+   - Implemented pending approval registration and append-only receipt write.
+   - Verified targeted tests and full suite.
+2. **Round 2 — Decision-id resolution path**
+   - Failing test added for `POST /v1/approvals/decisions/{decision_id}`.
+   - Implemented resolution lookup by decision-id with legacy resolver reuse.
+   - Verified targeted tests and full suite.
+3. **Round 3 — Decision-id query surface**
+   - Failing test added for `GET /v1/approvals/decisions/{decision_id}`.
+   - Implemented state projection for pending/resolved lifecycle queries.
+   - Verified targeted tests and full suite.
+4. **Round 4 — Fail-loud semantics and consistency guard**
+   - Failing tests added for unknown decision-id and mismatch on
+     `approval_resolved`.
+   - Added structured not-found path (`decision_id`) and governance mismatch
+     rejection (`APPROVAL_DECISION_ID_MISMATCH`).
+   - Verified targeted tests and full suite.
+5. **Round 5 — Closure hardening + compatibility proof**
+   - Failing test added for duplicate pending registration by decision-id.
+   - Enforced duplicate registration rejection and added explicit legacy-route
+     compatibility test.
+   - Published gap assessment and ran full suite.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_issue46_decision_approval_docs.py`
+- `./.venv/bin/pytest -q tests/test_approvals_api.py`
+- `./.venv/bin/pytest -q tests/test_event_ingest_validation.py`
+- `./.venv/bin/pytest -q`
+
+### Key Findings
+
+- Issue `#46` acceptance criteria is now satisfied for decision-id registration,
+  resolve-once semantics, duplicate/late rejection, and decision-level query.
+- Legacy route remains operational, minimizing migration risk for existing
+  callers.
+- Downstream blockers remain for #47 (token-gated executor), #48
+  (tamper-evident chain), and #49 (purchase-specific deterministic demo).
+
 ## 🗓️ 2026-02-18: Issue #45 — sub-issues 2 and 3 docs hardening + handoff
 
 ### Summary

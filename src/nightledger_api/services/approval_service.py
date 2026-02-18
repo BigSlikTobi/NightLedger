@@ -48,6 +48,7 @@ def list_pending_approvals(store: EventStore) -> dict[str, Any]:
         approvals.append(
             {
                 "event_id": pending_event.id,
+                "decision_id": payload.get("approval", {}).get("decision_id"),
                 "run_id": pending_event.run_id,
                 "requested_at": pending_context["requested_at"],
                 "requested_by": pending_context["requested_by"],
@@ -60,6 +61,84 @@ def list_pending_approvals(store: EventStore) -> dict[str, Any]:
 
     approvals.sort(key=lambda item: (item["requested_at"], item["event_id"]))
     return {"pending_count": len(approvals), "approvals": approvals}
+
+
+def register_pending_approval_request(
+    *,
+    store: EventStore,
+    decision_id: str,
+    run_id: str,
+    requested_by: str,
+    title: str,
+    details: str,
+    risk_level: Literal["low", "medium", "high"],
+    reason: str | None,
+) -> dict[str, Any]:
+    existing_decision_events = [
+        event
+        for event in store.list_all()
+        if event.payload.get("approval", {}).get("decision_id") == decision_id
+    ]
+    if existing_decision_events:
+        latest_reason = "resolved"
+        for event in existing_decision_events:
+            if _is_pending_signal(event):
+                latest_reason = "pending"
+            elif _is_resolution_signal(event):
+                latest_reason = "resolved"
+        raise DuplicateApprovalError(
+            event_id=decision_id,
+            detail_path="decision_id",
+            reason=latest_reason,
+        )
+
+    now = datetime.now(timezone.utc)
+    run_events = store.list_by_run_id(run_id)
+    if run_events:
+        latest_run_timestamp = max(event.timestamp for event in run_events)
+        if now <= latest_run_timestamp:
+            now = latest_run_timestamp + timedelta(milliseconds=1)
+
+    requested_at = _format_timestamp(now)
+    event_id = _build_decision_pending_event_id(decision_id=decision_id, timestamp=requested_at)
+    payload = validate_event_payload(
+        {
+            "id": event_id,
+            "run_id": run_id,
+            "timestamp": requested_at,
+            "type": "approval_requested",
+            "actor": "agent",
+            "title": title,
+            "details": details,
+            "confidence": None,
+            "risk_level": risk_level,
+            "requires_approval": True,
+            "approval": {
+                "status": "pending",
+                "decision_id": decision_id,
+                "requested_by": requested_by,
+                "resolved_by": None,
+                "resolved_at": None,
+                "reason": reason,
+            },
+            "evidence": [],
+            "meta": {"workflow": "approval_gate", "step": "approval_requested"},
+        }
+    )
+    try:
+        stored = store.append(payload)
+    except StorageWriteError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise StorageWriteError("storage backend append failed") from exc
+
+    return {
+        "status": "registered",
+        "decision_id": decision_id,
+        "event_id": stored.id,
+        "run_id": run_id,
+        "approval_status": "pending",
+    }
 
 
 def resolve_pending_approval(
@@ -106,6 +185,80 @@ def resolve_pending_approval(
     raise NoPendingApprovalError(event_id=event_id)
 
 
+def resolve_pending_approval_by_decision_id(
+    *,
+    store: EventStore,
+    decision_id: str,
+    decision: ApprovalDecision,
+    approver_id: str,
+    reason: str | None,
+) -> dict[str, Any]:
+    all_events = store.list_all()
+    decision_events = [
+        event
+        for event in all_events
+        if event.payload.get("approval", {}).get("decision_id") == decision_id
+    ]
+    if not decision_events:
+        raise ApprovalNotFoundError(event_id=decision_id, detail_path="decision_id")
+
+    pending_events = [event for event in decision_events if _is_pending_signal(event)]
+    if len(pending_events) > 1:
+        raise AmbiguousEventIdError(event_id=decision_id)
+    if not pending_events:
+        raise NoPendingApprovalError(event_id=decision_id)
+
+    target_event = pending_events[0]
+    result = resolve_pending_approval(
+        store=store,
+        event_id=target_event.id,
+        decision=decision,
+        approver_id=approver_id,
+        reason=reason,
+    )
+    result["decision_id"] = decision_id
+    return result
+
+
+def get_approval_decision_state(*, store: EventStore, decision_id: str) -> dict[str, Any]:
+    decision_events = [
+        event
+        for event in store.list_all()
+        if event.payload.get("approval", {}).get("decision_id") == decision_id
+    ]
+    if not decision_events:
+        raise ApprovalNotFoundError(event_id=decision_id, detail_path="decision_id")
+
+    requested_event: StoredEvent | None = None
+    resolved_event: StoredEvent | None = None
+    for event in decision_events:
+        if _is_pending_signal(event) and requested_event is None:
+            requested_event = event
+        if _is_resolution_signal(event):
+            resolved_event = event
+
+    anchor_event = resolved_event or requested_event or decision_events[-1]
+    approval_payload = anchor_event.payload.get("approval", {})
+    status = approval_payload.get("status")
+
+    return {
+        "decision_id": decision_id,
+        "run_id": anchor_event.run_id,
+        "status": status,
+        "requested_event_id": requested_event.id if requested_event is not None else None,
+        "resolved_event_id": resolved_event.id if resolved_event is not None else None,
+        "requested_at": _format_timestamp(requested_event.timestamp) if requested_event is not None else None,
+        "resolved_at": approval_payload.get("resolved_at"),
+        "requested_by": (
+            requested_event.payload.get("approval", {}).get("requested_by")
+            if requested_event is not None
+            else None
+        ),
+        "resolved_by": approval_payload.get("resolved_by"),
+        "reason": approval_payload.get("reason"),
+    }
+
+
 def _append_resolution_event(
     *,
     store: EventStore,
@@ -144,6 +297,7 @@ def _append_resolution_event(
         "requires_approval": True,
         "approval": {
             "status": decision,
+            "decision_id": approval_data.get("decision_id"),
             "requested_by": approval_data.get("requested_by"),
             "resolved_by": approver_id,
             "resolved_at": resolved_at,
@@ -413,6 +567,12 @@ def _build_resolution_event_id(
     compact_time = timestamp.replace("-", "").replace(":", "").replace(".", "")
     compact_time = compact_time.replace("T", "T").replace("Z", "Z")
     return f"apr_{target_event_id}_{decision}_{compact_time}_{uuid4().hex[:8]}"
+
+
+def _build_decision_pending_event_id(*, decision_id: str, timestamp: str) -> str:
+    compact_time = timestamp.replace("-", "").replace(":", "").replace(".", "")
+    compact_time = compact_time.replace("T", "T").replace("Z", "Z")
+    return f"evt_{decision_id}_pending_{compact_time}_{uuid4().hex[:8]}"
 
 
 def _format_timestamp(value: datetime) -> str:

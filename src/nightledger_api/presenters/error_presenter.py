@@ -146,7 +146,7 @@ def present_approval_not_found_error(exc: ApprovalNotFoundError) -> dict[str, An
             "message": "Approval target not found",
             "details": [
                 {
-                    "path": "event_id",
+                    "path": exc.detail_path,
                     "message": str(exc),
                     "type": "not_found",
                     "code": "APPROVAL_NOT_FOUND",
@@ -192,14 +192,19 @@ def present_no_pending_approval_error(exc: NoPendingApprovalError) -> dict[str, 
 
 
 def present_duplicate_approval_error(exc: DuplicateApprovalError) -> dict[str, Any]:
+    message = "Approval already resolved"
+    if exc.reason == "pending":
+        message = "Approval already pending"
+    elif exc.reason == "exists":
+        message = "Approval already exists"
     return {
         "error": {
             "code": "DUPLICATE_APPROVAL",
-            "message": "Approval already resolved",
+            "message": message,
             "rule_ids": ["RULE-GATE-003"],
             "details": [
                 {
-                    "path": "event_id",
+                    "path": exc.detail_path,
                     "message": str(exc),
                     "type": "state_conflict",
                     "code": "DUPLICATE_APPROVAL",

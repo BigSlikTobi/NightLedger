@@ -23,6 +23,7 @@ class Approval(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: ApprovalStatus
+    decision_id: str | None = None
     requested_by: str | None = None
     resolved_by: str | None = None
     resolved_at: datetime | None = None

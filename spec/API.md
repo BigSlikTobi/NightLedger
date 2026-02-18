@@ -211,6 +211,9 @@ Governance constraints (runtime/business-rule boundary):
   state (`requires_approval=true` and `approval.status=pending`).
 - `RULE-GATE-002`: `approval_resolved` events must be legal transitions from an
   existing pending gate.
+- `RULE-GATE-011`: when an active pending approval includes
+  `approval.decision_id`, the corresponding `approval_resolved` event must carry
+  the same decision identifier.
 - `RULE-RISK-005`: risky `action` events (`risk_level=high` or
   `requires_approval=true`) must include at least one evidence item.
 - `RULE-GATE-010`: `summary` events are only legal for completion when no
@@ -711,7 +714,81 @@ Issue links:
 - Parent: #5
 - Related constraints: #13, #15
 
-## POST /v1/approvals/{event_id}
+## POST /v1/approvals/requests
+
+Register a pending approval request by `decision_id`.
+
+Request:
+
+```json
+{
+  "decision_id": "dec_8b43f6748da8bb2d",
+  "run_id": "run_123",
+  "requested_by": "agent",
+  "title": "Approval required",
+  "details": "Purchase amount exceeds threshold",
+  "risk_level": "high",
+  "reason": "Amount above configured EUR threshold"
+}
+```
+
+Response (v0 draft):
+
+```json
+{
+  "status": "registered",
+  "decision_id": "dec_8b43f6748da8bb2d",
+  "event_id": "evt_dec_approval_req_...",
+  "run_id": "run_123",
+  "approval_status": "pending"
+}
+```
+
+Semantics:
+
+- Appends an `approval_requested` receipt in append-only storage.
+- Requires `approval.decision_id` link on the stored event payload.
+- Fails with `DUPLICATE_APPROVAL` if the same `decision_id` already exists
+  (pending or resolved lifecycle).
+
+## POST /v1/approvals/decisions/{decision_id}
+
+Resolve pending approval by `decision_id`.
+
+Request:
+
+```json
+{
+  "decision": "approved|rejected",
+  "approver_id": "human_123",
+  "reason": "optional"
+}
+```
+
+Response shape matches legacy resolve contract with `decision_id` included.
+
+## GET /v1/approvals/decisions/{decision_id}
+
+Query approval lifecycle state for one `decision_id`.
+
+Response (v0 draft):
+
+```json
+{
+  "decision_id": "dec_8b43f6748da8bb2d",
+  "run_id": "run_123",
+  "status": "pending|approved|rejected",
+  "requested_event_id": "evt_dec_approval_req_...",
+  "resolved_event_id": "apr_evt_... or null",
+  "requested_at": "2026-02-18T12:00:00Z",
+  "resolved_at": "2026-02-18T12:01:00Z or null",
+  "requested_by": "agent",
+  "resolved_by": "human_123 or null",
+  "reason": "optional"
+}
+```
+
+## POST /v1/approvals/{event_id} (legacy compatibility)
 
 Resolve pending approval.
 
@@ -783,7 +860,8 @@ Error responses (v0 draft):
 - Unknown target approval event: `404` / `APPROVAL_NOT_FOUND`
 - Ambiguous target event ID across runs: `409` / `AMBIGUOUS_EVENT_ID`
 - No currently pending approval for target: `409` / `NO_PENDING_APPROVAL`
-- Target approval already resolved: `409` / `DUPLICATE_APPROVAL`
+- Duplicate approval conflict (already pending or already resolved):
+  `409` / `DUPLICATE_APPROVAL`
 - Storage append failure while writing approval resolution: `500` / `STORAGE_WRITE_ERROR`
 - Stale resolution attempts for previously resolved targets return
   `DUPLICATE_APPROVAL` even if a different approval is currently pending.
@@ -829,6 +907,8 @@ Resolution semantics:
 - Orchestration failures are fail-loud: they produce structured API errors and
   a journal-visible `error` event (`meta.step: "run_stopped"`) to prevent silent
   state mutation.
+- This route remains supported for backward compatibility while decision-id
+  callers migrate to `POST /v1/approvals/decisions/{decision_id}`.
 
 Ambiguous event ID error response (v0 draft):
 
@@ -855,11 +935,11 @@ Duplicate approval error response (v0 draft):
 {
   "error": {
     "code": "DUPLICATE_APPROVAL",
-    "message": "Approval already resolved",
+    "message": "Approval already pending|Approval already resolved",
     "rule_ids": ["RULE-GATE-003"],
     "details": [
       {
-        "path": "event_id",
+        "path": "event_id|decision_id",
         "message": "Approval for event 'evt_123' has already been resolved",
         "type": "state_conflict",
         "code": "DUPLICATE_APPROVAL"

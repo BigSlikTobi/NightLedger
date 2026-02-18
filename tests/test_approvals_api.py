@@ -77,6 +77,19 @@ class _FailingApprovalAppendStore:
         return self._base.list_all()
 
 
+class _BrokenRegistrationStore:
+    def append(self, event: Any) -> Any:
+        _ = event
+        raise RuntimeError("unexpected append failure")
+
+    def list_by_run_id(self, run_id: str) -> list[Any]:
+        _ = run_id
+        return []
+
+    def list_all(self) -> list[Any]:
+        return []
+
+
 @pytest.fixture(autouse=True)
 def reset_dependencies() -> None:
     app.dependency_overrides.clear()
@@ -123,6 +136,7 @@ def test_get_pending_approvals_returns_unresolved_pending_events() -> None:
     assert len(body["approvals"]) == 1
     assert body["approvals"][0] == {
         "event_id": "evt_pending_1",
+        "decision_id": None,
         "run_id": "run_pending_1",
         "requested_at": "2026-02-16T09:00:00Z",
         "requested_by": "agent",
@@ -627,3 +641,251 @@ def test_post_approval_logs_structured_completion_to_uvicorn_logger(caplog) -> N
         and '"approver_id": "human_reviewer"' in record.message
         for record in caplog.records
     )
+
+
+def test_issue46_round1_registers_pending_approval_by_decision_id() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round1",
+            "run_id": "run_issue46_round1",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "registered"
+    assert body["decision_id"] == "dec_issue46_round1"
+    assert body["run_id"] == "run_issue46_round1"
+    assert body["approval_status"] == "pending"
+    assert isinstance(body["event_id"], str) and body["event_id"]
+
+    pending = client.get("/v1/approvals/pending")
+    assert pending.status_code == 200
+    pending_body = pending.json()
+    assert pending_body["pending_count"] == 1
+    assert pending_body["approvals"][0]["decision_id"] == "dec_issue46_round1"
+
+
+def test_issue46_round2_resolves_pending_approval_by_decision_id() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    register_response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round2",
+            "run_id": "run_issue46_round2",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert register_response.status_code == 200
+
+    resolve_response = client.post(
+        "/v1/approvals/decisions/dec_issue46_round2",
+        json={
+            "decision": "approved",
+            "approver_id": "human_reviewer",
+            "reason": "Approved for execution",
+        },
+    )
+
+    assert resolve_response.status_code == 200
+    body = resolve_response.json()
+    assert body["status"] == "resolved"
+    assert body["decision_id"] == "dec_issue46_round2"
+    assert body["decision"] == "approved"
+    assert body["run_id"] == "run_issue46_round2"
+
+
+def test_issue46_round3_queries_decision_id_approval_state() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    register_response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round3",
+            "run_id": "run_issue46_round3",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert register_response.status_code == 200
+
+    query_response = client.get("/v1/approvals/decisions/dec_issue46_round3")
+    assert query_response.status_code == 200
+    body = query_response.json()
+    assert body["decision_id"] == "dec_issue46_round3"
+    assert body["run_id"] == "run_issue46_round3"
+    assert body["status"] == "pending"
+    assert body["resolved_event_id"] is None
+    assert body["resolved_at"] is None
+
+
+def test_issue46_round4_rejects_duplicate_late_resolution_by_decision_id() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    register_response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round4",
+            "run_id": "run_issue46_round4",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert register_response.status_code == 200
+
+    first = client.post(
+        "/v1/approvals/decisions/dec_issue46_round4",
+        json={"decision": "approved", "approver_id": "human_reviewer"},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/v1/approvals/decisions/dec_issue46_round4",
+        json={"decision": "approved", "approver_id": "human_reviewer"},
+    )
+    assert second.status_code == 409
+    body = second.json()
+    assert body["error"]["code"] == "DUPLICATE_APPROVAL"
+
+
+def test_issue46_round4_query_unknown_decision_id_returns_not_found() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    response = client.get("/v1/approvals/decisions/dec_issue46_unknown")
+    assert response.status_code == 404
+    body = response.json()
+    assert body["error"]["code"] == "APPROVAL_NOT_FOUND"
+    assert body["error"]["details"][0]["path"] == "decision_id"
+
+
+def test_issue46_round5_rejects_duplicate_pending_registration_by_decision_id() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    first = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round5_dup",
+            "run_id": "run_issue46_round5_dup",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round5_dup",
+            "run_id": "run_issue46_round5_dup",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert second.status_code == 409
+    body = second.json()
+    assert body["error"]["code"] == "DUPLICATE_APPROVAL"
+    assert body["error"]["message"] == "Approval already pending"
+    assert body["error"]["details"][0]["message"] == (
+        "Approval for decision 'dec_issue46_round5_dup' is already pending"
+    )
+
+
+def test_issue46_round5_query_returns_resolved_state_after_decision_resolution() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    register_response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round5_query",
+            "run_id": "run_issue46_round5_query",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert register_response.status_code == 200
+    resolve_response = client.post(
+        "/v1/approvals/decisions/dec_issue46_round5_query",
+        json={"decision": "rejected", "approver_id": "human_reviewer"},
+    )
+    assert resolve_response.status_code == 200
+
+    query_response = client.get("/v1/approvals/decisions/dec_issue46_round5_query")
+    assert query_response.status_code == 200
+    body = query_response.json()
+    assert body["status"] == "rejected"
+    assert body["resolved_event_id"] is not None
+    assert body["resolved_by"] == "human_reviewer"
+    assert body["resolved_at"] is not None
+
+
+def test_issue46_round5_legacy_event_id_route_remains_supported() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    ingest(
+        build_event_payload(
+            event_id="evt_issue46_legacy_target",
+            run_id="run_issue46_legacy_target",
+            timestamp="2026-02-18T10:00:00Z",
+            event_type="approval_requested",
+            requires_approval=True,
+            approval_status="pending",
+            requested_by="agent",
+        )
+    )
+    response = client.post(
+        "/v1/approvals/evt_issue46_legacy_target",
+        json={"decision": "approved", "approver_id": "human_reviewer"},
+    )
+    assert response.status_code == 200
+    assert response.json()["target_event_id"] == "evt_issue46_legacy_target"
+
+
+def test_issue46_register_approval_request_unexpected_failure_maps_to_storage_write_error() -> None:
+    store = _BrokenRegistrationStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_unexpected_failure",
+            "run_id": "run_issue46_unexpected_failure",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "STORAGE_WRITE_ERROR"

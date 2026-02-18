@@ -63,12 +63,12 @@ createApp({
     controller.load();
     controller.loadPendingApprovals();
 
-    function onApprove(eventId) {
-      return controller.submitApprovalDecision(eventId, "approved");
+    function onApprove(approvalRef) {
+      return controller.submitApprovalDecision(approvalRef, "approved");
     }
 
-    function onReject(eventId) {
-      return controller.submitApprovalDecision(eventId, "rejected");
+    function onReject(approvalRef) {
+      return controller.submitApprovalDecision(approvalRef, "rejected");
     }
 
     return { state, cards, isDemo, onApprove, onReject };
@@ -96,20 +96,21 @@ createApp({
           <div v-if="state.pendingError" class="state state--error">{{ state.pendingError }}</div>
           <div v-if="state.pendingApprovals.length === 0" class="state">No pending approvals.</div>
           <div v-else class="pending-list">
-            <article v-for="item in state.pendingApprovals" :key="item.event_id" class="card card--approval">
+            <article v-for="item in state.pendingApprovals" :key="item.decision_id || item.event_id" class="card card--approval">
               <div class="card__head">
-                <h3>{{ item.title || item.event_id }}</h3>
+                <h3>{{ item.title || item.decision_id || item.event_id }}</h3>
                 <span class="pill">risk: {{ (item.risk_level || 'unknown').toUpperCase() }}</span>
               </div>
               <p>{{ item.summary || item.details || 'Approval required.' }}</p>
+              <p v-if="item.decision_id" class="muted"><code>decision: {{ item.decision_id }}</code></p>
               <div class="actions">
                 <button
-                  @click="onApprove(item.event_id)"
-                  :disabled="state.pendingSubmissionByEventId[item.event_id]"
+                  @click="onApprove(item.decision_id || item.event_id)"
+                  :disabled="state.pendingSubmissionByEventId[item.decision_id || item.event_id]"
                 >Approve</button>
                 <button
-                  @click="onReject(item.event_id)"
-                  :disabled="state.pendingSubmissionByEventId[item.event_id]"
+                  @click="onReject(item.decision_id || item.event_id)"
+                  :disabled="state.pendingSubmissionByEventId[item.decision_id || item.event_id]"
                 >Reject</button>
               </div>
             </article>

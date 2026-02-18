@@ -41,3 +41,26 @@ test("uses relative paths when api base is empty", async () => {
 
   assert.equal(calls[0], "/v1/approvals/evt_1");
 });
+
+test("uses decision-id approvals endpoint when decisionId is provided", async () => {
+  const calls = [];
+  const fetcher = async (url) => {
+    calls.push(url);
+    return {
+      ok: true,
+      async json() {
+        return {};
+      },
+    };
+  };
+  const client = createApiClient({ apiBase: "", fetcher });
+
+  await client.resolveApproval("dec_1", "approved", {
+    approverId: "human",
+    reason: "ok",
+    decisionId: "dec_1",
+    eventId: "evt_1",
+  });
+
+  assert.equal(calls[0], "/v1/approvals/decisions/dec_1");
+});

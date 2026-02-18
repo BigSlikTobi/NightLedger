@@ -175,3 +175,15 @@ Notes:
   itself.
 - To visualize custom scenarios in live UI/journal, append matching
   `approval_requested` or `action` events via `POST /v1/events`.
+
+## Decision-ID Approval Flow (Issue #46)
+
+New approval lifecycle endpoints:
+
+- `POST /v1/approvals/requests` to register pending approval by `decision_id`
+- `POST /v1/approvals/decisions/{decision_id}` to approve/reject once
+- `GET /v1/approvals/decisions/{decision_id}` to query approval result
+
+Legacy compatibility:
+
+- `POST /v1/approvals/{event_id}` remains available during migration.
