@@ -381,7 +381,7 @@ def register_approval_request(
     except (StorageReadError, StorageWriteError, DuplicateApprovalError):
         raise
     except Exception as exc:  # pragma: no cover - defensive wrapper
-        raise StorageReadError("storage backend read failed") from exc
+        raise StorageWriteError("storage backend append failed") from exc
 
 
 @router.post("/v1/approvals/{event_id}", status_code=status.HTTP_200_OK)

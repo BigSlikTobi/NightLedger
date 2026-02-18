@@ -77,6 +77,19 @@ class _FailingApprovalAppendStore:
         return self._base.list_all()
 
 
+class _BrokenRegistrationStore:
+    def append(self, event: Any) -> Any:
+        _ = event
+        raise RuntimeError("unexpected append failure")
+
+    def list_by_run_id(self, run_id: str) -> list[Any]:
+        _ = run_id
+        return []
+
+    def list_all(self) -> list[Any]:
+        return []
+
+
 @pytest.fixture(autouse=True)
 def reset_dependencies() -> None:
     app.dependency_overrides.clear()
@@ -854,3 +867,25 @@ def test_issue46_round5_legacy_event_id_route_remains_supported() -> None:
     )
     assert response.status_code == 200
     assert response.json()["target_event_id"] == "evt_issue46_legacy_target"
+
+
+def test_issue46_register_approval_request_unexpected_failure_maps_to_storage_write_error() -> None:
+    store = _BrokenRegistrationStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+
+    response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_unexpected_failure",
+            "run_id": "run_issue46_unexpected_failure",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "STORAGE_WRITE_ERROR"
