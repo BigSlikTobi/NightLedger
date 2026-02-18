@@ -15,6 +15,7 @@ from nightledger_api.services.approval_service import (
     resolve_pending_approval,
 )
 from nightledger_api.services.authorize_action_service import (
+    AuthorizeActionContext,
     AuthorizeActionRequest,
     evaluate_authorize_action,
 )
@@ -38,9 +39,11 @@ from nightledger_api.services.errors import (
     ExecutionTokenReplayedError,
 )
 from nightledger_api.services.execution_token_service import (
+    build_purchase_payload_hash,
     mint_execution_token,
     verify_execution_token,
 )
+from nightledger_api.services.execution_replay_store import SQLiteExecutionReplayStore
 from nightledger_api.services.journal_projection_service import project_run_journal
 from nightledger_api.services.run_status_service import project_run_status
 
@@ -51,7 +54,7 @@ logger = logging.getLogger(__name__)
 uvicorn_logger = logging.getLogger("uvicorn.error")
 logger.setLevel(logging.INFO)
 uvicorn_logger.setLevel(logging.INFO)
-_used_execution_token_jtis: set[str] = set()
+_execution_replay_store = SQLiteExecutionReplayStore()
 
 
 class ApprovalDecisionRequest(BaseModel):
@@ -75,6 +78,14 @@ class ApprovalRequestRegistrationPayload(BaseModel):
 
 
 class PurchaseCreateExecutionRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    amount: float = Field(gt=0)
+    currency: Literal["EUR"]
+    merchant: str = Field(min_length=1)
+
+
+class ExecutionTokenMintRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     amount: float = Field(gt=0)
@@ -282,6 +293,11 @@ def authorize_action(payload: AuthorizeActionRequest) -> dict[str, Any]:
     token, expires_at = mint_execution_token(
         decision_id=decision["decision_id"],
         action=payload.intent.action,
+        payload_hash=build_purchase_payload_hash(
+            amount=payload.context.amount,
+            currency=payload.context.currency,
+            merchant=_context_merchant(payload.context),
+        ),
     )
     return {
         **decision,
@@ -532,11 +548,19 @@ def execute_purchase_create(
     claims = verify_execution_token(
         token=token,
         expected_action="purchase.create",
+        expected_payload_hash=build_purchase_payload_hash(
+            amount=payload.amount,
+            currency=payload.currency,
+            merchant=payload.merchant,
+        ),
     )
     jti = str(claims["jti"])
-    if jti in _used_execution_token_jtis:
+    consumed = _execution_replay_store.consume_once(
+        jti=jti,
+        exp_unix=int(claims["exp"]),
+    )
+    if not consumed:
         raise ExecutionTokenReplayedError()
-    _used_execution_token_jtis.add(jti)
 
     return {
         "status": "executed",
@@ -550,6 +574,7 @@ def execute_purchase_create(
 @router.post("/v1/approvals/decisions/{decision_id}/execution-token", status_code=status.HTTP_200_OK)
 def mint_execution_token_for_decision(
     decision_id: str,
+    payload: ExecutionTokenMintRequest,
     store: EventStore = Depends(get_event_store),
 ) -> dict[str, Any]:
     state = get_approval_decision_state(store=store, decision_id=decision_id)
@@ -559,6 +584,11 @@ def mint_execution_token_for_decision(
     token, expires_at = mint_execution_token(
         decision_id=decision_id,
         action="purchase.create",
+        payload_hash=build_purchase_payload_hash(
+            amount=payload.amount,
+            currency=payload.currency,
+            merchant=payload.merchant,
+        ),
     )
     return {
         "decision_id": decision_id,
@@ -581,3 +611,13 @@ def _extract_bearer_token(authorization: str | None) -> str:
     if not token:
         raise ExecutionTokenMissingError()
     return token
+
+
+def _context_merchant(context: AuthorizeActionContext) -> str | None:
+    merchant = getattr(context, "merchant", None)
+    if merchant is None:
+        return None
+    if isinstance(merchant, str):
+        value = merchant.strip()
+        return value if value else None
+    return str(merchant)

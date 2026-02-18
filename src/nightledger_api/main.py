@@ -23,7 +23,9 @@ from nightledger_api.presenters.error_presenter import (
     present_execution_decision_not_approved_error,
     present_execution_token_expired_error,
     present_execution_token_invalid_error,
+    present_execution_token_misconfigured_error,
     present_execution_token_missing_error,
+    present_execution_payload_mismatch_error,
     present_execution_token_replayed_error,
 )
 from nightledger_api.services.errors import (
@@ -42,7 +44,9 @@ from nightledger_api.services.errors import (
     ExecutionDecisionNotApprovedError,
     ExecutionTokenExpiredError,
     ExecutionTokenInvalidError,
+    ExecutionTokenMisconfiguredError,
     ExecutionTokenMissingError,
+    ExecutionPayloadMismatchError,
     ExecutionTokenReplayedError,
 )
 
@@ -270,4 +274,26 @@ async def handle_execution_decision_not_approved_error(
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
         content=present_execution_decision_not_approved_error(exc),
+    )
+
+
+@app.exception_handler(ExecutionPayloadMismatchError)
+async def handle_execution_payload_mismatch_error(
+    request: Request, exc: ExecutionPayloadMismatchError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content=present_execution_payload_mismatch_error(exc),
+    )
+
+
+@app.exception_handler(ExecutionTokenMisconfiguredError)
+async def handle_execution_token_misconfigured_error(
+    request: Request, exc: ExecutionTokenMisconfiguredError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=present_execution_token_misconfigured_error(exc),
     )

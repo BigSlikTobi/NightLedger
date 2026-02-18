@@ -18,8 +18,10 @@ from nightledger_api.services.errors import (
     ExecutionDecisionNotApprovedError,
     ExecutionTokenExpiredError,
     ExecutionTokenInvalidError,
+    ExecutionTokenMisconfiguredError,
     ExecutionTokenMissingError,
     ExecutionTokenReplayedError,
+    ExecutionPayloadMismatchError,
 )
 
 
@@ -398,6 +400,42 @@ def present_execution_decision_not_approved_error(
                     "message": str(exc),
                     "type": "state_conflict",
                     "code": "EXECUTION_DECISION_NOT_APPROVED",
+                }
+            ],
+        }
+    }
+
+
+def present_execution_payload_mismatch_error(exc: ExecutionPayloadMismatchError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "EXECUTION_PAYLOAD_MISMATCH",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "payload",
+                    "message": str(exc),
+                    "type": "auth_error",
+                    "code": "EXECUTION_PAYLOAD_MISMATCH",
+                }
+            ],
+        }
+    }
+
+
+def present_execution_token_misconfigured_error(
+    exc: ExecutionTokenMisconfiguredError,
+) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "EXECUTION_TOKEN_MISCONFIGURED",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "configuration",
+                    "message": str(exc),
+                    "type": "configuration_error",
+                    "code": "EXECUTION_TOKEN_MISCONFIGURED",
                 }
             ],
         }

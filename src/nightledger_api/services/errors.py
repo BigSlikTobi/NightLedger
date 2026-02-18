@@ -153,3 +153,13 @@ class ExecutionDecisionNotApprovedError(ExecutionTokenError):
     def __init__(self, *, decision_id: str) -> None:
         self.decision_id = decision_id
         super().__init__(f"Decision '{decision_id}' is not approved for execution")
+
+
+class ExecutionPayloadMismatchError(ExecutionTokenError):
+    def __init__(self) -> None:
+        super().__init__("Execution token payload binding does not match request")
+
+
+class ExecutionTokenMisconfiguredError(ExecutionTokenError):
+    def __init__(self, *, message: str) -> None:
+        super().__init__(message)
