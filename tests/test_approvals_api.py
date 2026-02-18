@@ -795,7 +795,12 @@ def test_issue46_round5_rejects_duplicate_pending_registration_by_decision_id() 
         },
     )
     assert second.status_code == 409
-    assert second.json()["error"]["code"] == "DUPLICATE_APPROVAL"
+    body = second.json()
+    assert body["error"]["code"] == "DUPLICATE_APPROVAL"
+    assert body["error"]["message"] == "Approval already pending"
+    assert body["error"]["details"][0]["message"] == (
+        "Approval for decision 'dec_issue46_round5_dup' is already pending"
+    )
 
 
 def test_issue46_round5_query_returns_resolved_state_after_decision_resolution() -> None:

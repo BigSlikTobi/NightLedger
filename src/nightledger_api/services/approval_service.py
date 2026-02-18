@@ -80,7 +80,17 @@ def register_pending_approval_request(
         if event.payload.get("approval", {}).get("decision_id") == decision_id
     ]
     if existing_decision_events:
-        raise DuplicateApprovalError(event_id=decision_id, detail_path="decision_id")
+        latest_reason = "resolved"
+        for event in existing_decision_events:
+            if _is_pending_signal(event):
+                latest_reason = "pending"
+            elif _is_resolution_signal(event):
+                latest_reason = "resolved"
+        raise DuplicateApprovalError(
+            event_id=decision_id,
+            detail_path="decision_id",
+            reason=latest_reason,
+        )
 
     now = datetime.now(timezone.utc)
     run_events = store.list_by_run_id(run_id)

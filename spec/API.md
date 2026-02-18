@@ -748,7 +748,8 @@ Semantics:
 
 - Appends an `approval_requested` receipt in append-only storage.
 - Requires `approval.decision_id` link on the stored event payload.
-- Fails if the same `decision_id` already has an active pending gate.
+- Fails with `DUPLICATE_APPROVAL` if the same `decision_id` already exists
+  (pending or resolved lifecycle).
 
 ## POST /v1/approvals/decisions/{decision_id}
 
@@ -859,7 +860,8 @@ Error responses (v0 draft):
 - Unknown target approval event: `404` / `APPROVAL_NOT_FOUND`
 - Ambiguous target event ID across runs: `409` / `AMBIGUOUS_EVENT_ID`
 - No currently pending approval for target: `409` / `NO_PENDING_APPROVAL`
-- Target approval already resolved: `409` / `DUPLICATE_APPROVAL`
+- Duplicate approval conflict (already pending or already resolved):
+  `409` / `DUPLICATE_APPROVAL`
 - Storage append failure while writing approval resolution: `500` / `STORAGE_WRITE_ERROR`
 - Stale resolution attempts for previously resolved targets return
   `DUPLICATE_APPROVAL` even if a different approval is currently pending.
@@ -933,11 +935,11 @@ Duplicate approval error response (v0 draft):
 {
   "error": {
     "code": "DUPLICATE_APPROVAL",
-    "message": "Approval already resolved",
+    "message": "Approval already pending|Approval already resolved",
     "rule_ids": ["RULE-GATE-003"],
     "details": [
       {
-        "path": "event_id",
+        "path": "event_id|decision_id",
         "message": "Approval for event 'evt_123' has already been resolved",
         "type": "state_conflict",
         "code": "DUPLICATE_APPROVAL"
