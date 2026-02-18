@@ -24,3 +24,9 @@ def test_issue46_sub_issue_artifact_exists_and_records_boundaries() -> None:
     assert "Issue #46 Sub-Issue Breakdown" in artifact
     assert "Sub-issue A" in artifact
     assert "Sub-issue D" in artifact
+
+
+def test_issue46_business_rules_docs_include_decision_id_consistency_rule() -> None:
+    rules = _read("spec/BUSINESS_RULES.md")
+    assert "RULE-GATE-011" in rules
+    assert "APPROVAL_DECISION_ID_MISMATCH" in rules

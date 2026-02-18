@@ -210,6 +210,14 @@ behavior. This rule catalog uses the same field names as
   - IF `type=summary` and run has unresolved pending approval
   - THEN reject with `PENDING_APPROVAL_EXISTS`
 
+### RULE-GATE-011: Decision-ID Consistency for Resolution
+
+- Needs: active pending approval decision link, `approval.decision_id`
+- Rule:
+  - IF active pending approval has a `decision_id`
+  - THEN `approval_resolved.approval.decision_id` must match it
+  - otherwise reject with `APPROVAL_DECISION_ID_MISMATCH`
+
 ## Confidence
 
 ### RULE-CONF-001: Confidence Optionality

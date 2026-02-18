@@ -211,6 +211,9 @@ Governance constraints (runtime/business-rule boundary):
   state (`requires_approval=true` and `approval.status=pending`).
 - `RULE-GATE-002`: `approval_resolved` events must be legal transitions from an
   existing pending gate.
+- `RULE-GATE-011`: when an active pending approval includes
+  `approval.decision_id`, the corresponding `approval_resolved` event must carry
+  the same decision identifier.
 - `RULE-RISK-005`: risky `action` events (`risk_level=high` or
   `requires_approval=true`) must include at least one evidence item.
 - `RULE-GATE-010`: `summary` events are only legal for completion when no
