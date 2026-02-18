@@ -1,5 +1,6 @@
 import json
 import logging
+from hashlib import sha256
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, status
@@ -40,6 +41,19 @@ class ApprovalDecisionRequest(BaseModel):
     decision: Literal["approved", "rejected"]
     approver_id: str = Field(min_length=1)
     reason: str | None = None
+
+
+class AuthorizeActionIntent(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    action: Literal["purchase.create"]
+
+
+class AuthorizeActionRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    intent: AuthorizeActionIntent
+    context: dict[str, Any]
 
 
 def get_event_store() -> EventStore:
@@ -231,6 +245,27 @@ def _log_structured(level: int, payload: dict[str, Any], *, exc_info: bool = Fal
     message = json.dumps(payload)
     logger.log(level, message, exc_info=exc_info)
     uvicorn_logger.log(level, message, exc_info=exc_info)
+
+
+@router.post("/v1/mcp/authorize_action", status_code=status.HTTP_200_OK)
+def authorize_action(payload: AuthorizeActionRequest) -> dict[str, str]:
+    decision_id = _build_deterministic_decision_id(payload=payload)
+    return {
+        "decision_id": decision_id,
+        "state": "allow",
+        "reason_code": "TRANSPORT_CONTRACT_ACCEPTED",
+    }
+
+
+def _build_deterministic_decision_id(*, payload: AuthorizeActionRequest) -> str:
+    canonical_payload = {
+        "intent": payload.intent.model_dump(mode="json"),
+        "context": payload.context,
+    }
+    fingerprint = sha256(
+        json.dumps(canonical_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return f"dec_{fingerprint[:16]}"
 
 
 @router.post("/v1/events", status_code=status.HTTP_201_CREATED)

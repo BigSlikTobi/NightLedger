@@ -248,6 +248,40 @@ def present_approval_request_validation_error(
     }
 
 
+def present_authorize_action_request_validation_error(
+    exc: RequestValidationError,
+) -> dict[str, Any]:
+    details: list[dict[str, str]] = []
+
+    for error in exc.errors():
+        loc = error.get("loc", ())
+        if len(loc) < 2 or loc[0] != "body":
+            continue
+
+        path = ".".join(str(part) for part in loc[1:])
+        details.append(
+            {
+                "path": path,
+                "message": str(error.get("msg", "Invalid input")),
+                "type": str(error.get("type", "validation_error")),
+                "code": _map_authorize_action_validation_code(
+                    path=path,
+                    error_type=str(error.get("type", "validation_error")),
+                ),
+            }
+        )
+
+    details.sort(key=lambda detail: (detail["path"], detail["code"], detail["type"]))
+
+    return {
+        "error": {
+            "code": "REQUEST_VALIDATION_ERROR",
+            "message": "authorize_action payload failed validation",
+            "details": details,
+        }
+    }
+
+
 def _map_approval_validation_code(*, path: str, error_type: str) -> str:
     if path == "decision":
         if error_type == "missing":
@@ -269,3 +303,19 @@ def _map_approval_rule_id(detail_code: str) -> str | None:
         "MISSING_APPROVER_ID": "RULE-GATE-007",
     }
     return mapping.get(detail_code)
+
+
+def _map_authorize_action_validation_code(*, path: str, error_type: str) -> str:
+    if path == "intent":
+        if error_type == "missing":
+            return "MISSING_INTENT"
+        return "INVALID_INTENT"
+    if path == "context":
+        if error_type == "missing":
+            return "MISSING_CONTEXT"
+        return "INVALID_CONTEXT"
+    if path == "intent.action":
+        if error_type == "missing":
+            return "MISSING_ACTION"
+        return "UNSUPPORTED_ACTION"
+    return "REQUEST_VALIDATION_ERROR"

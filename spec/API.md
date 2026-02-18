@@ -3,6 +3,60 @@
 This is the canonical HTTP contract source for NightLedger runtime endpoints,
 response envelopes, and endpoint-level behavior.
 
+## POST /v1/mcp/authorize_action
+
+Authorize an agent intent before an external side effect is executed.
+
+Behavior (issue #44 sub-issue 1 scope):
+
+- Valid payload: `200 OK`
+- Invalid payload: `422 Unprocessable Entity`
+- Supported action in v1 transport contract: `purchase.create`
+- Decision state returned in this sub-issue: `allow`
+- Every successful decision includes deterministic `decision_id`.
+
+Request payload:
+
+```json
+{
+  "intent": {
+    "action": "purchase.create"
+  },
+  "context": {
+    "request_id": "req_123"
+  }
+}
+```
+
+Success response:
+
+```json
+{
+  "decision_id": "dec_1d51e326dbd1e7f0",
+  "state": "allow",
+  "reason_code": "TRANSPORT_CONTRACT_ACCEPTED"
+}
+```
+
+Request validation error response:
+
+```json
+{
+  "error": {
+    "code": "REQUEST_VALIDATION_ERROR",
+    "message": "authorize_action payload failed validation",
+    "details": [
+      {
+        "path": "intent.action",
+        "message": "Input should be 'purchase.create'",
+        "type": "literal_error",
+        "code": "UNSUPPORTED_ACTION"
+      }
+    ]
+  }
+}
+```
+
 ## POST /v1/events
 
 Ingest one event.

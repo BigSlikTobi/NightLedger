@@ -8,6 +8,25 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #44 — sub-issue 1 transport contract baseline
+
+### Summary
+
+Documented issue `#44` into atomic sub-issues in
+`docs/artifacts/issue-44/sub_issues.md` and completed only sub-issue 1 in this
+branch. Added the initial MCP transport contract endpoint
+`POST /v1/mcp/authorize_action` for `purchase.create`, with deterministic
+`decision_id` generation and structured request-validation errors in the
+standard NightLedger error envelope. This sub-issue intentionally limits
+decision behavior to the transport baseline (`state=allow`) and defers decision
+state expansion/policy logic to later sub-issues.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_mcp_authorize_action_api.py`
+- `./.venv/bin/pytest -q`
+- `node --test model/*.test.js controller/*.test.js view/*.test.js`
+
 ## 🗓️ 2026-02-17: Issue #67 — MCP + policy execution track consolidation
 
 ### Summary

@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from nightledger_api.controllers.events_controller import router as events_router
 from nightledger_api.presenters.error_presenter import (
+    present_authorize_action_request_validation_error,
     present_ambiguous_event_id_error,
     present_approval_not_found_error,
     present_business_rule_validation_error,
@@ -60,6 +61,11 @@ app.include_router(events_router)
 async def handle_request_validation_error(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
+    if request.method == "POST" and request.url.path == "/v1/mcp/authorize_action":
+        return JSONResponse(
+            status_code=HTTP_422_UNPROCESSABLE,
+            content=present_authorize_action_request_validation_error(exc),
+        )
     if request.method == "POST" and request.url.path.startswith("/v1/approvals/"):
         return JSONResponse(
             status_code=HTTP_422_UNPROCESSABLE,
