@@ -49,11 +49,17 @@ class AuthorizeActionIntent(BaseModel):
     action: Literal["purchase.create"]
 
 
+class AuthorizeActionContext(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="allow")
+
+    transport_decision_hint: Literal["allow", "requires_approval", "deny"] | None = None
+
+
 class AuthorizeActionRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     intent: AuthorizeActionIntent
-    context: dict[str, Any]
+    context: AuthorizeActionContext
 
 
 def get_event_store() -> EventStore:
@@ -249,23 +255,33 @@ def _log_structured(level: int, payload: dict[str, Any], *, exc_info: bool = Fal
 
 @router.post("/v1/mcp/authorize_action", status_code=status.HTTP_200_OK)
 def authorize_action(payload: AuthorizeActionRequest) -> dict[str, str]:
+    state = payload.context.transport_decision_hint or "allow"
     decision_id = _build_deterministic_decision_id(payload=payload)
     return {
         "decision_id": decision_id,
-        "state": "allow",
-        "reason_code": "TRANSPORT_CONTRACT_ACCEPTED",
+        "state": state,
+        "reason_code": _reason_code_for_state(state=state),
     }
 
 
 def _build_deterministic_decision_id(*, payload: AuthorizeActionRequest) -> str:
     canonical_payload = {
         "intent": payload.intent.model_dump(mode="json"),
-        "context": payload.context,
+        "context": payload.context.model_dump(mode="json", exclude_none=True),
     }
     fingerprint = sha256(
         json.dumps(canonical_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     return f"dec_{fingerprint[:16]}"
+
+
+def _reason_code_for_state(*, state: str) -> str:
+    mapping = {
+        "allow": "TRANSPORT_CONTRACT_ACCEPTED",
+        "requires_approval": "TRANSPORT_REQUIRES_APPROVAL",
+        "deny": "TRANSPORT_DENIED",
+    }
+    return mapping[state]
 
 
 @router.post("/v1/events", status_code=status.HTTP_201_CREATED)

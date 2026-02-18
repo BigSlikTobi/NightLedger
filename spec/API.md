@@ -7,12 +7,14 @@ response envelopes, and endpoint-level behavior.
 
 Authorize an agent intent before an external side effect is executed.
 
-Behavior (issue #44 sub-issue 1 scope):
+Behavior (issue #44):
 
 - Valid payload: `200 OK`
 - Invalid payload: `422 Unprocessable Entity`
 - Supported action in v1 transport contract: `purchase.create`
-- Decision state returned in this sub-issue: `allow`
+- `context.transport_decision_hint` is optional and supports:
+  `allow|requires_approval|deny`
+- Decision state defaults to `allow` when hint is omitted
 - Every successful decision includes deterministic `decision_id`.
 
 Request payload:
@@ -23,18 +25,41 @@ Request payload:
     "action": "purchase.create"
   },
   "context": {
-    "request_id": "req_123"
+    "request_id": "req_123",
+    "transport_decision_hint": "requires_approval"
   }
 }
 ```
 
-Success response:
+Success responses:
+
+`allow` (default when hint is omitted):
 
 ```json
 {
   "decision_id": "dec_1d51e326dbd1e7f0",
   "state": "allow",
   "reason_code": "TRANSPORT_CONTRACT_ACCEPTED"
+}
+```
+
+`requires_approval`:
+
+```json
+{
+  "decision_id": "dec_8b43f6748da8bb2d",
+  "state": "requires_approval",
+  "reason_code": "TRANSPORT_REQUIRES_APPROVAL"
+}
+```
+
+`deny`:
+
+```json
+{
+  "decision_id": "dec_2b57476a7dbf302d",
+  "state": "deny",
+  "reason_code": "TRANSPORT_DENIED"
 }
 ```
 
@@ -51,6 +76,25 @@ Request validation error response:
         "message": "Input should be 'purchase.create'",
         "type": "literal_error",
         "code": "UNSUPPORTED_ACTION"
+      }
+    ]
+  }
+}
+```
+
+Invalid decision hint example:
+
+```json
+{
+  "error": {
+    "code": "REQUEST_VALIDATION_ERROR",
+    "message": "authorize_action payload failed validation",
+    "details": [
+      {
+        "path": "context.transport_decision_hint",
+        "message": "Input should be 'allow', 'requires_approval' or 'deny'",
+        "type": "literal_error",
+        "code": "INVALID_TRANSPORT_DECISION_HINT"
       }
     ]
   }

@@ -318,4 +318,8 @@ def _map_authorize_action_validation_code(*, path: str, error_type: str) -> str:
         if error_type == "missing":
             return "MISSING_ACTION"
         return "UNSUPPORTED_ACTION"
+    if path == "context.transport_decision_hint":
+        if error_type == "missing":
+            return "MISSING_TRANSPORT_DECISION_HINT"
+        return "INVALID_TRANSPORT_DECISION_HINT"
     return "REQUEST_VALIDATION_ERROR"
