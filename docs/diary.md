@@ -8,6 +8,27 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #44 — sub-issues 2 and 3 decision states + operator docs
+
+### Summary
+
+Completed the remaining scope for issue `#44` while keeping policy logic out of
+this transport issue boundary. The `POST /v1/mcp/authorize_action` contract now
+supports deterministic decision states through
+`context.transport_decision_hint` (`allow|requires_approval|deny`) with a
+state-specific `reason_code` mapping and deterministic `decision_id` behavior.
+Added validation support for invalid hints via
+`INVALID_TRANSPORT_DECISION_HINT`. Updated operator-facing docs with copy-paste
+`curl` request/response examples for all three states and added doc-lock tests
+to keep the README/API contract in sync.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_mcp_authorize_action_api.py`
+- `./.venv/bin/pytest -q tests/test_issue44_mcp_authorize_action_docs.py`
+- `./.venv/bin/pytest -q`
+- `node --test model/*.test.js controller/*.test.js view/*.test.js`
+
 ## 🗓️ 2026-02-18: Issue #44 — sub-issue 1 transport contract baseline
 
 ### Summary
