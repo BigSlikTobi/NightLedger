@@ -614,7 +614,7 @@ def test_post_events_rejects_approval_resolved_decision_id_mismatch() -> None:
             "message": "approval_resolved decision_id does not match active pending approval",
             "type": "state_conflict",
             "code": "APPROVAL_DECISION_ID_MISMATCH",
-            "rule_id": "RULE-GATE-004",
+            "rule_id": "RULE-GATE-011",
         }
     ]
 

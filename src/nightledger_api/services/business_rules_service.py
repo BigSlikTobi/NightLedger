@@ -97,7 +97,7 @@ def validate_event_business_rules(
                         ),
                         type="state_conflict",
                         code="APPROVAL_DECISION_ID_MISMATCH",
-                        rule_id="RULE-GATE-004",
+                        rule_id="RULE-GATE-011",
                     )
                 )
         resolved_by = event.approval.resolved_by
@@ -200,6 +200,7 @@ def _rule_id_for_code(code: str) -> str:
         "NO_PENDING_APPROVAL": "RULE-GATE-002",
         "DUPLICATE_PENDING_APPROVAL": "RULE-GATE-001",
         "INVALID_APPROVAL_TRANSITION": "RULE-GATE-004",
+        "APPROVAL_DECISION_ID_MISMATCH": "RULE-GATE-011",
         "MISSING_APPROVER_ID": "RULE-GATE-007",
         "MISSING_APPROVAL_TIMESTAMP": "RULE-GATE-008",
         "TERMINAL_STATE_CONFLICT": "RULE-GATE-005",
