@@ -1,4 +1,10 @@
-import { createApp, computed, reactive } from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
+import {
+  createApp,
+  computed,
+  onMounted,
+  onUnmounted,
+  reactive,
+} from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
 import { MOCK_EVENTS, MOCK_PENDING_APPROVALS } from "../model/mock_data.js";
 import { toTimelineCards } from "../model/timeline_model.js";
 import { createApiClient } from "../controller/api_client.js";
@@ -27,6 +33,7 @@ createApp({
 
     const cards = computed(() => toTimelineCards(state.events));
     const isDemo = computed(() => state.mode === "demo");
+    let refreshTimer = null;
 
     const controller = createTimelineController({
       runId: state.runId,
@@ -62,6 +69,21 @@ createApp({
 
     controller.load();
     controller.loadPendingApprovals();
+
+    onMounted(() => {
+      if (state.mode !== "live") return;
+      refreshTimer = window.setInterval(() => {
+        controller.load();
+        controller.loadPendingApprovals();
+      }, 3000);
+    });
+
+    onUnmounted(() => {
+      if (refreshTimer !== null) {
+        window.clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+    });
 
     function onApprove(approvalRef) {
       return controller.submitApprovalDecision(approvalRef, "approved");

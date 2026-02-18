@@ -30,6 +30,7 @@ def mint_execution_token(
     secret: str | None = None,
     ttl_seconds: int | None = None,
     payload_hash: str | None = None,
+    run_id: str | None = None,
     kid: str | None = None,
 ) -> tuple[str, str]:
     issued_at = _normalize_now(now)
@@ -48,6 +49,8 @@ def mint_execution_token(
     }
     if payload_hash is not None:
         payload["payload_hash"] = payload_hash
+    if run_id is not None and run_id.strip() != "":
+        payload["run_id"] = run_id.strip()
 
     payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     payload_b64 = _b64url_encode(payload_json)
@@ -97,12 +100,15 @@ def verify_execution_token(
     nbf = payload.get("nbf")
     jti = payload.get("jti")
     token_payload_hash = payload.get("payload_hash")
+    run_id = payload.get("run_id")
 
     if not isinstance(action, str) or not isinstance(decision_id, str) or not isinstance(exp, int):
         raise ExecutionTokenInvalidError()
     if not isinstance(nbf, int) or not isinstance(jti, str):
         raise ExecutionTokenInvalidError()
     if token_payload_hash is not None and not isinstance(token_payload_hash, str):
+        raise ExecutionTokenInvalidError()
+    if run_id is not None and not isinstance(run_id, str):
         raise ExecutionTokenInvalidError()
 
     now_ts = int(issued_at.timestamp())
@@ -128,6 +134,7 @@ def verify_execution_token(
         "jti": jti,
         "kid": kid,
         "payload_hash": token_payload_hash,
+        "run_id": run_id,
     }
 
 
