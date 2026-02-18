@@ -146,7 +146,7 @@ def present_approval_not_found_error(exc: ApprovalNotFoundError) -> dict[str, An
             "message": "Approval target not found",
             "details": [
                 {
-                    "path": "event_id",
+                    "path": exc.detail_path,
                     "message": str(exc),
                     "type": "not_found",
                     "code": "APPROVAL_NOT_FOUND",

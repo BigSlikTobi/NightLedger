@@ -79,6 +79,27 @@ def validate_event_business_rules(
                     rule_id="RULE-GATE-002",
                 )
             )
+        else:
+            pending_event_id = pending_approval.get("event_id")
+            pending_event = _find_event_by_id(existing_events, pending_event_id)
+            pending_decision_id = (
+                pending_event.payload.get("approval", {}).get("decision_id")
+                if pending_event is not None
+                else None
+            )
+            if pending_decision_id is not None and event.approval.decision_id != pending_decision_id:
+                violations.append(
+                    BusinessRuleViolationDetail(
+                        path="approval.decision_id",
+                        message=(
+                            "approval_resolved decision_id does not match active "
+                            "pending approval"
+                        ),
+                        type="state_conflict",
+                        code="APPROVAL_DECISION_ID_MISMATCH",
+                        rule_id="RULE-GATE-004",
+                    )
+                )
         resolved_by = event.approval.resolved_by
         if resolved_by is None or (isinstance(resolved_by, str) and not resolved_by.strip()):
             violations.append(
@@ -197,4 +218,13 @@ def _terminal_status_from_event_payload(payload: dict[str, object]) -> str | Non
         if isinstance(step, str):
             return _TERMINAL_STEP_STATUS.get(step)
 
+    return None
+
+
+def _find_event_by_id(events: list[StoredEvent], event_id: str | None) -> StoredEvent | None:
+    if event_id is None:
+        return None
+    for event in events:
+        if event.id == event_id:
+            return event
     return None

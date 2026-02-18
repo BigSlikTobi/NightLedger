@@ -580,6 +580,45 @@ def test_post_events_rejects_resolved_approval_without_resolution_timestamp() ->
     ]
 
 
+def test_post_events_rejects_approval_resolved_decision_id_mismatch() -> None:
+    pending_payload = valid_event_payload()
+    pending_payload["id"] = "evt_pending_decision_mismatch"
+    pending_payload["type"] = "approval_requested"
+    pending_payload["requires_approval"] = True
+    pending_payload["approval"]["status"] = "pending"
+    pending_payload["approval"]["decision_id"] = "dec_expected"
+    pending_payload["approval"]["requested_by"] = "agent"
+    pending_payload["approval"]["resolved_by"] = None
+    pending_payload["approval"]["resolved_at"] = None
+    pending_response = client.post("/v1/events", json=pending_payload)
+    assert pending_response.status_code == 201
+
+    resolved_payload = valid_event_payload()
+    resolved_payload["id"] = "evt_resolution_decision_mismatch"
+    resolved_payload["timestamp"] = "2026-02-14T13:01:00Z"
+    resolved_payload["type"] = "approval_resolved"
+    resolved_payload["requires_approval"] = True
+    resolved_payload["approval"]["status"] = "approved"
+    resolved_payload["approval"]["decision_id"] = "dec_unexpected"
+    resolved_payload["approval"]["requested_by"] = "agent"
+    resolved_payload["approval"]["resolved_by"] = "human_reviewer"
+    resolved_payload["approval"]["resolved_at"] = "2026-02-14T13:01:00Z"
+
+    response = client.post("/v1/events", json=resolved_payload)
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+    assert body["error"]["details"] == [
+        {
+            "path": "approval.decision_id",
+            "message": "approval_resolved decision_id does not match active pending approval",
+            "type": "state_conflict",
+            "code": "APPROVAL_DECISION_ID_MISMATCH",
+            "rule_id": "RULE-GATE-004",
+        }
+    ]
+
+
 def test_post_events_rejects_mutating_event_after_terminal_run_state() -> None:
     terminal_payload = valid_event_payload()
     terminal_payload["id"] = "evt_terminal_marker"

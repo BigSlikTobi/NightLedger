@@ -714,3 +714,45 @@ def test_issue46_round3_queries_decision_id_approval_state() -> None:
     assert body["status"] == "pending"
     assert body["resolved_event_id"] is None
     assert body["resolved_at"] is None
+
+
+def test_issue46_round4_rejects_duplicate_late_resolution_by_decision_id() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    register_response = client.post(
+        "/v1/approvals/requests",
+        json={
+            "decision_id": "dec_issue46_round4",
+            "run_id": "run_issue46_round4",
+            "requested_by": "agent",
+            "title": "Approval required",
+            "details": "Purchase amount exceeds threshold",
+            "risk_level": "high",
+            "reason": "Above threshold",
+        },
+    )
+    assert register_response.status_code == 200
+
+    first = client.post(
+        "/v1/approvals/decisions/dec_issue46_round4",
+        json={"decision": "approved", "approver_id": "human_reviewer"},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/v1/approvals/decisions/dec_issue46_round4",
+        json={"decision": "approved", "approver_id": "human_reviewer"},
+    )
+    assert second.status_code == 409
+    body = second.json()
+    assert body["error"]["code"] == "DUPLICATE_APPROVAL"
+
+
+def test_issue46_round4_query_unknown_decision_id_returns_not_found() -> None:
+    store = InMemoryAppendOnlyEventStore()
+    app.dependency_overrides[get_event_store] = lambda: store
+    response = client.get("/v1/approvals/decisions/dec_issue46_unknown")
+    assert response.status_code == 404
+    body = response.json()
+    assert body["error"]["code"] == "APPROVAL_NOT_FOUND"
+    assert body["error"]["details"][0]["path"] == "decision_id"

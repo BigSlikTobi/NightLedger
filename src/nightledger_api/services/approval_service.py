@@ -181,7 +181,7 @@ def resolve_pending_approval_by_decision_id(
         if event.payload.get("approval", {}).get("decision_id") == decision_id
     ]
     if not decision_events:
-        raise ApprovalNotFoundError(event_id=decision_id)
+        raise ApprovalNotFoundError(event_id=decision_id, detail_path="decision_id")
 
     pending_events = [event for event in decision_events if _is_pending_signal(event)]
     if len(pending_events) > 1:
@@ -208,7 +208,7 @@ def get_approval_decision_state(*, store: EventStore, decision_id: str) -> dict[
         if event.payload.get("approval", {}).get("decision_id") == decision_id
     ]
     if not decision_events:
-        raise ApprovalNotFoundError(event_id=decision_id)
+        raise ApprovalNotFoundError(event_id=decision_id, detail_path="decision_id")
 
     requested_event: StoredEvent | None = None
     resolved_event: StoredEvent | None = None

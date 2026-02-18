@@ -70,9 +70,13 @@ class InconsistentRunStateError(Exception):
 
 
 class ApprovalNotFoundError(Exception):
-    def __init__(self, event_id: str) -> None:
+    def __init__(self, event_id: str, *, detail_path: str = "event_id") -> None:
         self.event_id = event_id
-        super().__init__(f"Approval target event '{event_id}' was not found")
+        self.detail_path = detail_path
+        if detail_path == "decision_id":
+            super().__init__(f"Approval decision '{event_id}' was not found")
+        else:
+            super().__init__(f"Approval target event '{event_id}' was not found")
 
 
 class AmbiguousEventIdError(Exception):
