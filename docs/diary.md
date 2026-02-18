@@ -8,6 +8,33 @@ layer.
 
 # Diary
 
+## 🗓️ 2026-02-18: Issue #45 — sub-issues 2 and 3 docs hardening + handoff
+
+### Summary
+
+Completed the remaining documented scope for issue `#45` without extending
+runtime behavior boundaries. Sub-issue 2 hardened operator and contract docs by
+adding explicit policy validation examples (`MISSING_AMOUNT`,
+`UNSUPPORTED_CURRENCY`) in `spec/API.md`, adding a request-driven policy
+operator flow in `README.md`, and tightening doc-lock tests. Sub-issue 3 added
+`docs/artifacts/issue-45/handoff.md` to map #45 outcomes to downstream
+ownership in `#46`, `#47`, and `#49`, including explicit out-of-scope
+guardrails to prevent overlap.
+
+### Validation
+
+- `./.venv/bin/pytest -q tests/test_issue45_policy_threshold_docs.py tests/test_issue45_handoff_docs.py`
+- `./.venv/bin/pytest -q`
+- `node --test model/*.test.js controller/*.test.js view/*.test.js`
+
+### Key Findings
+
+- The policy endpoint now has clear operator guidance, but UI visibility still
+  depends on append-only receipts (`POST /v1/events`) rather than
+  `authorize_action` responses alone.
+- Downstream sequencing remains unchanged: #46 (decision lifecycle), #47
+  (enforcement), #49 (purchase demo packaging).
+
 ## 🗓️ 2026-02-18: Issue #45 — sub-issue 1 policy threshold rule
 
 ### Summary

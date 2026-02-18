@@ -142,6 +142,44 @@ Invalid decision hint example:
 }
 ```
 
+Missing amount example:
+
+```json
+{
+  "error": {
+    "code": "REQUEST_VALIDATION_ERROR",
+    "message": "authorize_action payload failed validation",
+    "details": [
+      {
+        "path": "context.amount",
+        "message": "Field required",
+        "type": "missing",
+        "code": "MISSING_AMOUNT"
+      }
+    ]
+  }
+}
+```
+
+Unsupported currency example:
+
+```json
+{
+  "error": {
+    "code": "REQUEST_VALIDATION_ERROR",
+    "message": "authorize_action payload failed validation",
+    "details": [
+      {
+        "path": "context.currency",
+        "message": "Input should be 'EUR'",
+        "type": "literal_error",
+        "code": "UNSUPPORTED_CURRENCY"
+      }
+    ]
+  }
+}
+```
+
 ## POST /v1/events
 
 Ingest one event.

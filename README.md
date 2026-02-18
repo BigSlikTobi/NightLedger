@@ -137,3 +137,41 @@ PYTHONPATH=src ./.venv/bin/python -m nightledger_api.mcp_server
 
 The wrapper exposes one MCP tool, `authorize_action`, backed by the same
 deterministic contract used by `POST /v1/mcp/authorize_action`.
+
+## Policy Threshold Operator Flow (Issue #45)
+
+Use terminal requests for policy evaluation and keep UI focused on approval
+state projection.
+
+1) Start API with threshold `100`:
+
+```bash
+NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR=100 \
+PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --port 8001
+```
+
+2) Send policy decision requests:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
+  -H "Content-Type: application/json" \
+  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_120","amount":120,"currency":"EUR"}}'
+```
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
+  -H "Content-Type: application/json" \
+  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_80","amount":80,"currency":"EUR"}}'
+```
+
+3) Inspect pending approvals (UI reads from this endpoint):
+
+```bash
+curl -sS http://127.0.0.1:8001/v1/approvals/pending
+```
+
+Notes:
+- `authorize_action` returns decisions; it does not append timeline receipts by
+  itself.
+- To visualize custom scenarios in live UI/journal, append matching
+  `approval_requested` or `action` events via `POST /v1/events`.
