@@ -1,8 +1,10 @@
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Literal
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Header, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from nightledger_api.services.approval_service import (
@@ -31,7 +33,9 @@ from nightledger_api.services.errors import (
     SchemaValidationError,
     StorageReadError,
     StorageWriteError,
+    ExecutionTokenMissingError,
 )
+from nightledger_api.services.execution_token_service import verify_execution_token
 from nightledger_api.services.journal_projection_service import project_run_journal
 from nightledger_api.services.run_status_service import project_run_status
 
@@ -62,6 +66,14 @@ class ApprovalRequestRegistrationPayload(BaseModel):
     details: str = Field(min_length=1)
     risk_level: Literal["low", "medium", "high"]
     reason: str | None = None
+
+
+class PurchaseCreateExecutionRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    amount: float = Field(gt=0)
+    currency: Literal["EUR"]
+    merchant: str = Field(min_length=1)
 
 
 def get_event_store() -> EventStore:
@@ -490,3 +502,38 @@ def get_approval_by_decision_id(
         raise
     except Exception as exc:  # pragma: no cover - defensive wrapper
         raise StorageReadError("storage backend read failed") from exc
+
+
+@router.post("/v1/executors/purchase.create", status_code=status.HTTP_200_OK)
+def execute_purchase_create(
+    payload: PurchaseCreateExecutionRequest,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _ = payload
+    token = _extract_bearer_token(authorization)
+    claims = verify_execution_token(
+        token=token,
+        expected_action="purchase.create",
+    )
+    return {
+        "status": "executed",
+        "action": "purchase.create",
+        "decision_id": claims["decision_id"],
+        "execution_id": f"exec_{uuid4().hex[:16]}",
+        "executed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+
+
+def _extract_bearer_token(authorization: str | None) -> str:
+    if authorization is None:
+        raise ExecutionTokenMissingError()
+    value = authorization.strip()
+    if not value:
+        raise ExecutionTokenMissingError()
+    prefix = "bearer "
+    if not value.lower().startswith(prefix):
+        raise ExecutionTokenMissingError()
+    token = value[len(prefix) :].strip()
+    if not token:
+        raise ExecutionTokenMissingError()
+    return token
