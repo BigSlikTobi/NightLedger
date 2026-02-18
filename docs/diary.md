@@ -1998,3 +1998,42 @@ durable replay protection.
 - Runtime now supports safe key rotation via `kid` lookup.
 - Remaining future hardening (outside this pass): managed KMS integration and
   clustered replay-store backend.
+
+---
+
+## 🗓️ 2026-02-18: Issue #47 UI Representation + Persistence Pass (5-Round TDD)
+
+### Objective
+
+Move execution-token flow visibility from mostly hardcoded/demo representation
+into append-only runtime receipts that the live UI can project from real run
+state, and add event-store persistence option.
+
+### Round outcomes
+
+1. **Round 1:** Added failing tests for authorize decision/token mint receipts in
+   run journal; implemented runtime receipt appends for `authorize_action`.
+2. **Round 2:** Added failing test for post-approval token-mint receipt;
+   implemented append on
+   `POST /v1/approvals/decisions/{decision_id}/execution-token`.
+3. **Round 3:** Added failing tests for execution success + blocked-path receipts;
+   implemented append-only `error` and `action` runtime receipts on executor
+   paths.
+4. **Round 4:** Added failing persistence test and implemented
+   `SQLiteAppendOnlyEventStore` with `NIGHTLEDGER_EVENT_STORE_BACKEND=sqlite`.
+5. **Round 5:** Added live-mode UI polling wiring test and implemented periodic
+   refresh for timeline + pending approvals so new receipts appear without manual
+   reload.
+
+### Validation evidence
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_issue47_runtime_receipts_api.py tests/test_execution_token_integration_api.py tests/test_purchase_executor_api.py tests/test_issue47_end_to_end_api.py`
+- `cd apps/web && node --test model/*.test.js controller/*.test.js view/*.test.js`
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+
+### Findings
+
+- Live representation now tracks real authorize/mint/execute receipts for a
+  provided `run_id`.
+- Operators can persist runtime events across restarts using sqlite backend
+  config, reducing demo drift from in-memory resets.

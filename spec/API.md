@@ -41,6 +41,12 @@ Request payload:
 }
 ```
 
+Optional context fields:
+
+- `run_id`: when supplied, runtime decision/token/execution receipts are
+  appended to that run and become available in journal/status projections.
+- `merchant`: optional merchant descriptor used for payload-bound token hash.
+
 ## MCP stdio server: `authorize_action` tool
 
 NightLedger also exposes the same transport contract through a local MCP stdio
