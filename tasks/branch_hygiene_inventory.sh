@@ -37,5 +37,10 @@ while IFS= read -r ref; do
       continue
       ;;
   esac
+  found_candidate=1
   echo "git push origin --delete ${ref#origin/}"
 done <<<"${merged_refs}"
+
+if [[ "${found_candidate:-0}" -eq 0 ]]; then
+  echo "No deletion candidates found."
+fi

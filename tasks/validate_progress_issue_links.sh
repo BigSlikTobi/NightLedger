@@ -4,6 +4,26 @@ set -euo pipefail
 ROOT_DIR="${1:-$(pwd)}"
 DOCS_DIR="${ROOT_DIR}/docs"
 
+has_match() {
+  local pattern="$1"
+  local file="$2"
+  if command -v rg >/dev/null 2>&1; then
+    rg -q --pcre2 "${pattern}" "${file}"
+  else
+    grep -Eq "${pattern}" "${file}"
+  fi
+}
+
+has_match_ci() {
+  local pattern="$1"
+  local file="$2"
+  if command -v rg >/dev/null 2>&1; then
+    rg -qi --pcre2 "${pattern}" "${file}"
+  else
+    grep -Eiq "${pattern}" "${file}"
+  fi
+}
+
 if [[ ! -d "${DOCS_DIR}" ]]; then
   echo "docs directory not found under: ${ROOT_DIR}" >&2
   exit 1
@@ -25,12 +45,12 @@ if [[ "${#files[@]}" -eq 0 ]]; then
 fi
 
 for file in "${files[@]}"; do
-  if rg -qi '#(unknown|tbd)\b' "${file}"; then
+  if has_match_ci '#(unknown|tbd)[[:>:]]' "${file}"; then
     echo "Invalid issue placeholder found in ${file}: use numeric issue IDs." >&2
     exit 1
   fi
 
-  if ! rg -q '#[0-9]+' "${file}"; then
+  if ! has_match '#[0-9]+' "${file}"; then
     echo "Missing numeric issue reference in ${file}." >&2
     exit 1
   fi

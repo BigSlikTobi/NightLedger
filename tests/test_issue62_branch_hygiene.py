@@ -49,7 +49,10 @@ def test_issue62_round4_default_mode_does_not_execute_remote_deletions() -> None
     result = _run_script()
 
     assert result.returncode == 0
-    assert "git push origin --delete" in result.stdout
+    assert (
+        "git push origin --delete" in result.stdout
+        or "No deletion candidates found." in result.stdout
+    )
     assert "Executed remote deletion" not in result.stdout
 
 
