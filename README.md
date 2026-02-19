@@ -5,7 +5,7 @@
 This codebase is the result of my 5-day hackathon executed with my OpenClaw
 agent, `Deborahbot`.
 
-<img src="docs/images/deborahbot.png" width="80" alt="Deborahbot" />
+<img src="docs/images/Deborahbot.png" width="80" alt="Deborahbot" />
 
 ### Technical Problem We Wanted to Solve
 
