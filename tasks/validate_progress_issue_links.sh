@@ -45,7 +45,7 @@ if [[ "${#files[@]}" -eq 0 ]]; then
 fi
 
 for file in "${files[@]}"; do
-  if has_match_ci '#(unknown|tbd)[[:>:]]' "${file}"; then
+  if has_match_ci '#(unknown|tbd)([^[:alnum:]_]|$)' "${file}"; then
     echo "Invalid issue placeholder found in ${file}: use numeric issue IDs." >&2
     exit 1
   fi
