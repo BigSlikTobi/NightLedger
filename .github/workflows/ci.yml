@@ -5,6 +5,13 @@ on:
   pull_request:
 
 jobs:
+  validate-progress-refs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate progress issue references
+        run: bash tasks/validate_progress_issue_links.sh
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:
