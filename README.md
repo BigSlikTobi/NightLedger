@@ -2,88 +2,81 @@
 
 ## Hackathon Narrative (Last 5 Days)
 
-This repository is the output of a 5-day hackathon built around one assumption:
+This codebase is the result of a 5-day hackathon executed by Tobias Latta with
+his OpenClaw agent, `Deborrabotter`.
 
-> Autonomous systems can be useful in production only if they are accountable
-> by default.
+The assumption tested was simple:
 
-We tried to prove or disprove that assumption with code, not slides.
+> If autonomous systems must show their work before real-world impact,
+> autonomy can be deployed with trust instead of blind faith.
 
-Our working hypothesis:
+The goal was to prove or disprove that assumption through running software,
+contract tests, and deterministic demos.
 
-1. Every meaningful agent step must be captured as append-only evidence.
-2. Risky side effects must pause for explicit human approval.
-3. The system must expose deterministic contracts that bots can integrate.
-4. The resulting execution trail must be auditable by non-authors.
+Key hypothesis checks:
 
-Result at MVP scope: the hypothesis holds for the implemented workflows.
+1. Every meaningful step is captured as append-only evidence.
+2. Risky side effects are paused for explicit human approval.
+3. Bot integrations can rely on deterministic API/MCP contracts.
+4. The execution trail is auditable by people outside the authoring loop.
 
-## How We Build (agents.md)
+Result at MVP scope: this hypothesis is supported by the implemented flows.
 
-The team coded under `agents.md` constraints:
+## How This Was Built (agents.md)
 
-1. Docs first when behavior changes.
-2. TDD first (failing tests before implementation).
-3. Strict layer separation (Capture / Governance / Representation).
+Development followed the repo constitution in `agents.md`:
+
+1. Docs-first for behavior changes.
+2. TDD-first (failing tests before implementation).
+3. Strict separation of concerns (Capture / Governance / Representation).
 4. No silent failures.
-5. Atomic issue breakdown and atomic commits.
+5. Atomic issue breakdown and commits.
 6. 5-round TDD + audit discipline.
-7. Mandatory diary updates for completed issue work.
+7. Diary updates for every completed issue.
 
 ## Issues and Context
 
-Hackathon delivery was issue-sliced to keep scope testable and mergeable:
+Hackathon execution was issue-sliced and tracked in GitHub.
 
-- `#44`, `#45`, `#46`, `#47`, `#48`, `#49`
-- `#63`, `#64`, `#66`, `#67`, `#75`, `#76`
-- parent closure track: `#62`
+For complete history and current status:
 
-This list is the hackathon implementation track, not the full project history.
-
-Complete closed-issue history:
-
-- [NightLedger closed issues](https://github.com/BigSlikTobi/NightLedger/issues?q=is%3Aissue+is%3Aclosed)
+- [All issues](https://github.com/BigSlikTobi/NightLedger/issues)
+- [Open issues](https://github.com/BigSlikTobi/NightLedger/issues?q=is%3Aissue+is%3Aopen)
+- [Closed issues](https://github.com/BigSlikTobi/NightLedger/issues?q=is%3Aissue+is%3Aclosed)
 
 ## High-Level Outcome
 
-What was built:
+What was implemented:
 
-1. Append-only runtime evidence capture.
-2. Governance gates for risky actions (`requires_approval`).
-3. Human approval lifecycle with explicit decision state.
-4. Token-gated executor boundary for protected side effects.
-5. Tamper-evident audit export path.
-6. Deterministic demo flow (`block -> approve -> execute`).
-7. Local + remote MCP integration path.
-
-Why it matters:
-
-- Turns "trust us" into verifiable receipts.
-- Makes human override explicit and enforceable.
-- Keeps governance in backend policy, not UI heuristics.
+1. Append-only runtime accountability.
+2. Governance gates for risky actions.
+3. Human approval lifecycle.
+4. Token-gated protected execution.
+5. Tamper-evident audit export.
+6. Deterministic proof demo paths.
+7. Local and remote MCP integration support.
 
 ## Deconstructing Vision and MVP for Readers
 
 ### Vision
 
-NightLedger is the accountability layer for the agentic era: autonomy with
+NightLedger is an accountability layer for the agentic era: autonomy with
 receipts.
 
 ### MVP
 
-The MVP proves one control loop end to end:
+The MVP proves one full control loop:
 
 1. Start run
 2. Capture events
-3. Hit risk gate
+3. Hit a risk gate
 4. Pause for approval
 5. Approve/reject
-6. Resume/stop with a full receipt trail
+6. Resume/stop with receipts
 
-Out of scope in this phase: broader post-MVP intent-catalog evolution
-(`#84/#85/#86`).
+Post-MVP items remain tracked separately (for example `#84/#85/#86`).
 
-## Step-by-Step: Test and Run the System
+## Step-by-Step: Test and Run
 
 ### Quick Start (Fresh Clone)
 
@@ -103,7 +96,7 @@ cd apps/web
 node --test model/*.test.js controller/*.test.js view/*.test.js
 ```
 
-### Quick Start (Local Runtime)
+### Local Runtime
 
 1) Start API (Terminal A):
 
@@ -125,15 +118,13 @@ http://localhost:3000/view/?mode=live&runId=run_triage_inbox_demo_1&apiBase=http
 
 ### Deterministic purchase enforcement demo (Issue #49)
 
-Run the proof path for `block -> approve -> execute`:
+Run the `block -> approve -> execute` proof path:
 
 ```bash
 bash tasks/smoke_purchase_enforcement_demo.sh
 ```
 
 ## Canonical Sources of Truth
-
-Use one primary document per concern to avoid contract drift:
 
 | Concern | Canonical source |
 | --- | --- |
@@ -146,20 +137,19 @@ Use one primary document per concern to avoid contract drift:
 
 | Doc | Purpose |
 | --- | --- |
-| `README.md` | Vision, MVP, hackathon context, and quick-start navigation |
-| `docs/TECHNICAL_GUIDE.md` | Full technical and integration deep dive |
+| `README.md` | Vision, MVP, and hackathon context |
+| `docs/TECHNICAL_GUIDE.md` | Full conceptual + technical deep dive |
 | `spec/MVP/discovery.md` | Strategy and problem framing |
 | `spec/MVP/MVP.md` | MVP scope and success criteria |
 | `spec/MVP/product_design.md` | Layered design principles |
 | `spec/MVP/roadmap.md` | Current execution roadmap |
 | `docs/API_TESTING.md` | Local API smoke flows |
 | `docs/DEMO_SCRIPT.md` | Reproducible demo handoff path |
-| `docs/SHOWCASE_E2E_SETUP.md` | Non-technical end-to-end showcase operator playbook |
-| `docs/REPO_HYGIENE.md` | Branch/artifact hygiene policy and cleanup workflow |
+| `docs/SHOWCASE_E2E_SETUP.md` | End-to-end showcase operator playbook |
+| `docs/REPO_HYGIENE.md` | Branch/artifact hygiene policy |
 
 ## Technical Deep Dive
 
-For conceptual + technical details (contracts, runtime flow, endpoints,
-transport, and implementation boundaries), use:
+For the conceptual + technical implementation details, use:
 
 - `/Users/tobiaslatta/Projects/github/bigsliktobi/NightLedger/docs/TECHNICAL_GUIDE.md`
