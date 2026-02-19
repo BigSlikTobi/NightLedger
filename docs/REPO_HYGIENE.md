@@ -4,6 +4,7 @@ This document defines the repo hygiene policy for stale branches and generated
 artifacts.
 
 Closure track for cleanup umbrella #62: Issue #66.
+Operationalization update: SI-62B (#89).
 
 ## Branch Inventory Snapshot (2026-02-17)
 
@@ -67,6 +68,23 @@ Approved operator command template once confirmed:
 ```bash
 git push origin --delete <branch-name>
 ```
+
+## Operational Workflow (SI-62B)
+
+Branch hygiene execution remains operator-confirmed and non-destructive by
+default.
+
+Inventory command:
+
+```bash
+bash tasks/branch_hygiene_inventory.sh
+```
+
+Guardrails:
+
+- dry-run output only; no remote deletion execution.
+- protected refs (`origin/main`, `origin/HEAD`, `origin`) are excluded.
+- deletion commands are output as templates for a human operator to run.
 
 ## Branch Retention Policy
 
