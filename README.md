@@ -1,7 +1,178 @@
 # <img src="docs/images/nightledger_logo.png" width="80" alt="NightLedger 3D Logo" /> NightLedger: Autonomy with Receipts.
 
-NightLedger is an accountability layer for agent workflows: append-only event
-capture, governance gating for risky actions, and human-readable receipts.
+## Hackathon Narrative (Last 5 Days)
+
+For the last five days, this repository has been developed as a focused
+hackathon effort around one core assumption:
+
+> If we force autonomous systems to show their work before real-world impact,
+> then autonomy can be shipped with trust instead of blind faith.
+
+NightLedger exists to prove or disprove that assumption with running code,
+contract tests, and deterministic demos.
+
+The hypothesis was not "can we build another agent tool," but:
+
+1. Can we capture every meaningful action as append-only evidence?
+2. Can we enforce a real pause gate before risky side effects?
+3. Can a human review and approve with full context and receipts?
+4. Can this be integrated by real bot runtimes using clear contracts?
+
+The answer from this hackathon implementation is: yes, at MVP scope.
+
+## How We Build (agents.md Process)
+
+`agents.md` is the delivery operating system for this repo. The practical rules
+we followed:
+
+1. Docs first when behavior changes.
+2. TDD first: failing tests before implementation.
+3. Strict separation of concerns:
+   - Capture layer ingests events only.
+   - Governance layer evaluates risk/approval logic only.
+   - Representation layer projects state for humans only.
+4. No silent failures: structured, explicit errors.
+5. Atomic issue execution and atomic commits.
+6. 5-round TDD and audit protocol per issue.
+7. Diary updates are mandatory for completed issue work.
+
+## Issues and Context
+
+The hackathon execution used issue-driven slicing so each capability was
+shippable and testable:
+
+- `#44`: MCP `authorize_action` contract.
+- `#45`: policy threshold rule (`purchase.amount > 100 EUR`).
+- `#46`: decision-id approval lifecycle.
+- `#47`: token-gated executor trust boundary.
+- `#48`: tamper-evident audit receipts/export.
+- `#49`: deterministic `block -> approve -> execute` demo packaging.
+- `#63`: CI and fresh-clone parity.
+- `#64`: source-of-truth reconciliation.
+- `#66`: repo hygiene policy.
+- `#67`: backlog dependency-track consolidation.
+- `#75`: remote MCP transport wrapper.
+- `#76`: adoption bootstrap and contract versioning.
+- `#62`: parent cleanup consolidation and closure pass.
+
+## High-Level Hackathon Outcome
+
+What we built and why:
+
+1. Append-only runtime accountability model so actions are traceable.
+2. Governance gate that blocks risky actions until explicit approval.
+3. Deterministic API and MCP contracts for runtime integrations.
+4. Human-readable run projections (`status`, `journal`) for oversight.
+5. Tamper-evident audit exports for decision-level evidence.
+6. Deterministic end-to-end demo scripts for judges/operators.
+7. Local and remote MCP adoption path for real bot clients.
+
+Why this matters:
+
+- It converts "agent trust" from promise to verifiable process.
+- It gives operators a concrete red-button protocol.
+- It keeps governance in backend enforcement, not UI heuristics.
+
+## Step-by-Step: Test and Run the System
+
+### Quick Start (Fresh Clone)
+
+```bash
+git clone https://github.com/bigsliktobi/NightLedger.git
+cd NightLedger
+python -m venv .venv
+./.venv/bin/pip install --upgrade pip
+./.venv/bin/pip install -r requirements.txt
+```
+
+### Local Verification (Matches CI)
+
+```bash
+./.venv/bin/pytest -q
+cd apps/web
+node --test model/*.test.js controller/*.test.js view/*.test.js
+```
+
+### Quick Start (Local Runtime)
+
+#### 1) Start API (Terminal A)
+
+```bash
+PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --reload --port 8001
+```
+
+#### 2) Start web UI (Terminal B)
+
+```bash
+npm --prefix apps/web start
+```
+
+Open:
+
+```text
+http://localhost:3000/view/?mode=live&runId=run_triage_inbox_demo_1&apiBase=http://127.0.0.1:8001
+```
+
+### Local Demo Data Reset
+
+```bash
+bash tasks/reset_seed_triage_inbox_demo.sh
+```
+
+This seeds a deterministic paused run (`run_triage_inbox_demo_1`) for approval
+and journal demo flows.
+
+### Deterministic purchase enforcement demo (Issue #49)
+
+Run the purchase proof path for `block -> approve -> execute`:
+
+```bash
+bash tasks/smoke_purchase_enforcement_demo.sh
+```
+
+## Step-by-Step: Integrate and Implement Against NightLedger
+
+Implementation flow for real bot runtimes:
+
+1. Call `authorize_action` over MCP or HTTP.
+2. If decision is `allow`, proceed.
+3. If decision is `requires_approval`, pause fail-closed.
+4. Register pending approval and surface it to human operator UI.
+5. Poll decision endpoint until approved/rejected.
+6. If approved, mint execution token.
+7. Execute protected side effect with token.
+8. Export audit receipts when needed.
+
+This is the core runtime contract we validated in the hackathon.
+
+## Deconstructing Vision and MVP for Readers
+
+### Vision (Why NightLedger exists)
+
+NightLedger is an accountability layer for the agentic era.
+The product thesis is not just "automation," but governance that scales:
+
+- Every action leaves a receipt.
+- Every risky action can be interrupted.
+- Every human decision is explicit and auditable.
+
+### MVP (What we intentionally shipped)
+
+From `spec/MVP/MVP.md` and `spec/MVP/product_design.md`, the MVP centers on a
+single demonstrable control loop:
+
+1. Start a run.
+2. Emit structured events.
+3. Trigger a risky decision.
+4. Pause for approval.
+5. Approve/reject.
+6. Resume/stop with receipts.
+
+What MVP is not:
+
+- It is not full enterprise policy authoring UI.
+- It is not final production hardening for distributed multi-instance runtime.
+- It is not complete post-MVP intent catalog orchestration (`#84/#85/#86`).
 
 ## Canonical Sources of Truth
 
@@ -27,71 +198,48 @@ Use one primary document per concern to avoid contract drift:
 | `docs/SHOWCASE_E2E_SETUP.md` | Non-technical end-to-end showcase operator playbook |
 | `docs/REPO_HYGIENE.md` | Branch/artifact hygiene policy and cleanup workflow |
 
-## Quick Start (Fresh Clone)
+## Architecture and Code Walkthrough
 
-```bash
-git clone https://github.com/bigsliktobi/NightLedger.git
-cd NightLedger
-python -m venv .venv
-./.venv/bin/pip install --upgrade pip
-./.venv/bin/pip install -r requirements.txt
-```
+### 1) Capture Layer
 
-## Local Verification (Matches CI)
+Primary concern: ingest immutable runtime events.
 
-```bash
-./.venv/bin/pytest -q
-cd apps/web
-node --test model/*.test.js controller/*.test.js view/*.test.js
-```
+- Endpoints and controllers in `src/nightledger_api/controllers/`.
+- Event model/schema validation in `src/nightledger_api/models/event_schema.py`.
+- Append-only stores in `src/nightledger_api/services/event_store.py`.
 
-## Adoption v1 Quickstart (Issue #76)
+### 2) Governance Layer
 
-One command boots API + MCP runtime for local adoption flows:
+Primary concern: policy and enforcement decisions.
 
-```bash
-bash tasks/bootstrap_nightledger_runtime.sh
-```
+- Policy and authorization in `src/nightledger_api/services/authorize_action_service.py` and `src/nightledger_api/services/business_rules_service.py`.
+- Approval lifecycle in `src/nightledger_api/services/approval_service.py`.
+- Execution-token issuance and trust checks in `src/nightledger_api/services/execution_token_service.py`.
 
-This path is designed to prove setup -> connect -> call tool in under 10 minutes,
-including both API + MCP process startup.
+### 3) Representation Layer
 
-## Quick Start (Local Runtime)
+Primary concern: project immutable data into human-readable state.
 
-### 1) Start API (Terminal A)
+- Run status projection in `src/nightledger_api/services/run_status_service.py`.
+- Journal projection in `src/nightledger_api/services/journal_projection_service.py`.
+- UI model/controller/view in `apps/web/model`, `apps/web/controller`, and `apps/web/view`.
 
-```bash
-PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --reload --port 8001
-```
+### Runtime and Transport Entry Points
 
-### 2) Start web UI (Terminal B)
+- API runtime app: `src/nightledger_api/main.py`
+- MCP stdio: `src/nightledger_api/mcp_server.py`
+- MCP remote HTTP transport: `src/nightledger_api/mcp_remote_server.py`
+- Shared MCP protocol core: `src/nightledger_api/mcp_protocol.py`
 
-```bash
-npm --prefix apps/web start
-```
+### Why this code shape
 
-Open:
+The implementation enforces "autonomy with receipts" by construction:
 
-```text
-http://localhost:3000/view/?mode=live&runId=run_triage_inbox_demo_1&apiBase=http://127.0.0.1:8001
-```
-
-## Local Demo Data Reset
-
-```bash
-bash tasks/reset_seed_triage_inbox_demo.sh
-```
-
-This seeds a deterministic paused run (`run_triage_inbox_demo_1`) for approval
-and journal demo flows.
-
-## Deterministic purchase enforcement demo (Issue #49)
-
-Run the purchase proof path for `block -> approve -> execute`:
-
-```bash
-bash tasks/smoke_purchase_enforcement_demo.sh
-```
+- immutable append-only history,
+- deterministic policy transitions,
+- explicit human approvals,
+- runtime token-bound execution,
+- and verifiable audit export.
 
 ## Real bot workflow (Issue #49 v1)
 
@@ -345,6 +493,17 @@ OAuth metadata discovery endpoint (if your bot platform supports it):
 ```text
 http://<server-ip>:8002/.well-known/oauth-protected-resource
 ```
+
+## Adoption v1 Quickstart (Issue #76)
+
+One command boots API + MCP runtime for local adoption flows:
+
+```bash
+bash tasks/bootstrap_nightledger_runtime.sh
+```
+
+This path is designed to prove setup -> connect -> call tool in under 10 minutes,
+including both API + MCP process startup.
 
 ## Adoption v1 demo flow (under 10 minutes)
 
