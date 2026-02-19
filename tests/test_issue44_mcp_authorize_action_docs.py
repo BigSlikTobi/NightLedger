@@ -9,7 +9,7 @@ def _load(path: str) -> str:
 
 
 def test_issue44_readme_includes_mcp_authorize_action_examples() -> None:
-    readme = _load("README.md")
+    readme = _load("docs/TECHNICAL_GUIDE.md")
 
     assert "## MCP authorize_action (Issue #44 v1 contract)" in readme
     assert "POST /v1/mcp/authorize_action" in readme

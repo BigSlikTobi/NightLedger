@@ -6,7 +6,7 @@ def _read(path: str) -> str:
 
 
 def test_issue49_readme_documents_real_bot_mcp_plus_http_workflow() -> None:
-    readme = _read("README.md")
+    readme = _read("docs/TECHNICAL_GUIDE.md")
     normalized = readme.lower()
 
     assert "real bot" in normalized

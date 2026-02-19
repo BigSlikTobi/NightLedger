@@ -32,7 +32,7 @@ def test_issue48_business_rules_include_hash_chain_integrity_rule() -> None:
 
 
 def test_issue48_readme_docs_include_audit_export_flow() -> None:
-    readme = _read("README.md")
+    readme = _read("docs/TECHNICAL_GUIDE.md")
     assert "## Audit Export Flow (Issue #48)" in readme
     assert "GET /v1/approvals/decisions/{decision_id}/audit-export" in readme
     assert "hash" in readme

@@ -33,7 +33,7 @@ def test_issue75_api_spec_documents_remote_mcp_transport_and_auth() -> None:
 
 
 def test_issue75_readme_includes_remote_mcp_operator_setup() -> None:
-    readme = _load("README.md")
+    readme = _load("docs/TECHNICAL_GUIDE.md")
     assert "### MCP remote server wrapper" in readme
     assert "nightledger_api.mcp_remote_server" in readme
     assert "NIGHTLEDGER_MCP_REMOTE_AUTH_TOKEN" in readme

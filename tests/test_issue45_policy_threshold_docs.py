@@ -36,7 +36,7 @@ def test_issue45_api_spec_documents_policy_threshold_contract() -> None:
 
 
 def test_issue45_readme_documents_policy_inputs_and_outcomes() -> None:
-    readme = _load("README.md")
+    readme = _load("docs/TECHNICAL_GUIDE.md")
 
     assert "Policy rule (Issue #45 sub-issue 1):" in readme
     assert "amount\":100" in readme
