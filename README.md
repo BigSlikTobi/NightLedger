@@ -24,7 +24,7 @@ Result at MVP scope: this hypothesis is supported by the implemented flows.
 
 ## How This Was Built (agents.md)
 
-I followed the repo constitution in `agents.md`:
+I followed the repo constitution in [`agents.md`](agents.md):
 
 1. Docs-first for behavior changes.
 2. TDD-first (failing tests before implementation).
@@ -63,6 +63,12 @@ What I implemented:
 NightLedger is an accountability layer for the agentic era: autonomy with
 receipts.
 
+Related source documents:
+
+- [`spec/MVP/discovery.md`](spec/MVP/discovery.md)
+- [`spec/MVP/MVP.md`](spec/MVP/MVP.md)
+- [`spec/MVP/product_design.md`](spec/MVP/product_design.md)
+
 ### MVP
 
 The MVP proves one full control loop:
@@ -75,6 +81,13 @@ The MVP proves one full control loop:
 6. Resume/stop with receipts
 
 Post-MVP items remain tracked separately (for example `#84/#85/#86`).
+
+Related implementation contracts:
+
+- [`spec/API.md`](spec/API.md)
+- [`spec/EVENT_SCHEMA.md`](spec/EVENT_SCHEMA.md)
+- [`spec/BUSINESS_RULES.md`](spec/BUSINESS_RULES.md)
+- [`docs/TECHNICAL_GUIDE.md`](docs/TECHNICAL_GUIDE.md)
 
 ## Step-by-Step: Test and Run
 
@@ -128,28 +141,28 @@ bash tasks/smoke_purchase_enforcement_demo.sh
 
 | Concern | Canonical source |
 | --- | --- |
-| Runtime behavior and layer boundaries | `docs/ARCHITECTURE.md` |
-| HTTP API contract and error envelopes | `spec/API.md` |
-| Event payload schema contract | `spec/EVENT_SCHEMA.md` |
-| Governance/risk/approval rule catalog | `spec/BUSINESS_RULES.md` |
+| Runtime behavior and layer boundaries | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| HTTP API contract and error envelopes | [`spec/API.md`](spec/API.md) |
+| Event payload schema contract | [`spec/EVENT_SCHEMA.md`](spec/EVENT_SCHEMA.md) |
+| Governance/risk/approval rule catalog | [`spec/BUSINESS_RULES.md`](spec/BUSINESS_RULES.md) |
 
 ## Documentation Map
 
 | Doc | Purpose |
 | --- | --- |
-| `README.md` | Vision, MVP, and hackathon context |
-| `docs/TECHNICAL_GUIDE.md` | Full conceptual + technical deep dive |
-| `spec/MVP/discovery.md` | Strategy and problem framing |
-| `spec/MVP/MVP.md` | MVP scope and success criteria |
-| `spec/MVP/product_design.md` | Layered design principles |
-| `spec/MVP/roadmap.md` | Current execution roadmap |
-| `docs/API_TESTING.md` | Local API smoke flows |
-| `docs/DEMO_SCRIPT.md` | Reproducible demo handoff path |
-| `docs/SHOWCASE_E2E_SETUP.md` | End-to-end showcase operator playbook |
-| `docs/REPO_HYGIENE.md` | Branch/artifact hygiene policy |
+| [`README.md`](README.md) | Vision, MVP, and hackathon context |
+| [`docs/TECHNICAL_GUIDE.md`](docs/TECHNICAL_GUIDE.md) | Full conceptual + technical deep dive |
+| [`spec/MVP/discovery.md`](spec/MVP/discovery.md) | Strategy and problem framing |
+| [`spec/MVP/MVP.md`](spec/MVP/MVP.md) | MVP scope and success criteria |
+| [`spec/MVP/product_design.md`](spec/MVP/product_design.md) | Layered design principles |
+| [`spec/MVP/roadmap.md`](spec/MVP/roadmap.md) | Current execution roadmap |
+| [`docs/API_TESTING.md`](docs/API_TESTING.md) | Local API smoke flows |
+| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | Reproducible demo handoff path |
+| [`docs/SHOWCASE_E2E_SETUP.md`](docs/SHOWCASE_E2E_SETUP.md) | End-to-end showcase operator playbook |
+| [`docs/REPO_HYGIENE.md`](docs/REPO_HYGIENE.md) | Branch/artifact hygiene policy |
 
 ## Technical Deep Dive
 
 For the conceptual + technical implementation details, use:
 
-- `/Users/tobiaslatta/Projects/github/bigsliktobi/NightLedger/docs/TECHNICAL_GUIDE.md`
+- [`docs/TECHNICAL_GUIDE.md`](docs/TECHNICAL_GUIDE.md)

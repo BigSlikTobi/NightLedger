@@ -3,14 +3,16 @@
 This document is my technical deep dive for NightLedger.
 I implemented this hackathon with my OpenClaw agent `Deborrabotter`.
 
-Vision/MVP/hackathon narrative lives in `/README.md`.
+Vision/MVP/hackathon narrative lives in [`README.md`](../README.md).
 
 ## Quick Navigation
 
-- Runtime/API contracts: `spec/API.md`
-- Event schema: `spec/EVENT_SCHEMA.md`
-- Rule catalog: `spec/BUSINESS_RULES.md`
-- Architecture boundaries: `docs/ARCHITECTURE.md`
+- Runtime/API contracts: [`spec/API.md`](../spec/API.md)
+- Event schema: [`spec/EVENT_SCHEMA.md`](../spec/EVENT_SCHEMA.md)
+- Rule catalog: [`spec/BUSINESS_RULES.md`](../spec/BUSINESS_RULES.md)
+- Architecture boundaries: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
+- MVP and vision framing: [`spec/MVP/MVP.md`](../spec/MVP/MVP.md),
+  [`spec/MVP/product_design.md`](../spec/MVP/product_design.md)
 
 ## Architecture and Code Walkthrough
 
@@ -18,32 +20,49 @@ Vision/MVP/hackathon narrative lives in `/README.md`.
 
 Primary concern: ingest immutable runtime events.
 
-- Endpoints and controllers in `src/nightledger_api/controllers/`.
-- Event model/schema validation in `src/nightledger_api/models/event_schema.py`.
-- Append-only stores in `src/nightledger_api/services/event_store.py`.
+- Endpoints and controllers in
+  [`src/nightledger_api/controllers/`](../src/nightledger_api/controllers/).
+- Event model/schema validation in
+  [`src/nightledger_api/models/event_schema.py`](../src/nightledger_api/models/event_schema.py).
+- Append-only stores in
+  [`src/nightledger_api/services/event_store.py`](../src/nightledger_api/services/event_store.py).
 
 ### 2) Governance Layer
 
 Primary concern: policy and enforcement decisions.
 
-- Policy and authorization in `src/nightledger_api/services/authorize_action_service.py` and `src/nightledger_api/services/business_rules_service.py`.
-- Approval lifecycle in `src/nightledger_api/services/approval_service.py`.
-- Execution-token issuance and trust checks in `src/nightledger_api/services/execution_token_service.py`.
+- Policy and authorization in
+  [`src/nightledger_api/services/authorize_action_service.py`](../src/nightledger_api/services/authorize_action_service.py)
+  and
+  [`src/nightledger_api/services/business_rules_service.py`](../src/nightledger_api/services/business_rules_service.py).
+- Approval lifecycle in
+  [`src/nightledger_api/services/approval_service.py`](../src/nightledger_api/services/approval_service.py).
+- Execution-token issuance and trust checks in
+  [`src/nightledger_api/services/execution_token_service.py`](../src/nightledger_api/services/execution_token_service.py).
 
 ### 3) Representation Layer
 
 Primary concern: project immutable data into human-readable state.
 
-- Run status projection in `src/nightledger_api/services/run_status_service.py`.
-- Journal projection in `src/nightledger_api/services/journal_projection_service.py`.
-- UI model/controller/view in `apps/web/model`, `apps/web/controller`, and `apps/web/view`.
+- Run status projection in
+  [`src/nightledger_api/services/run_status_service.py`](../src/nightledger_api/services/run_status_service.py).
+- Journal projection in
+  [`src/nightledger_api/services/journal_projection_service.py`](../src/nightledger_api/services/journal_projection_service.py).
+- UI model/controller/view in
+  [`apps/web/model`](../apps/web/model),
+  [`apps/web/controller`](../apps/web/controller), and
+  [`apps/web/view`](../apps/web/view).
 
 ### Runtime and Transport Entry Points
 
-- API runtime app: `src/nightledger_api/main.py`
-- MCP stdio: `src/nightledger_api/mcp_server.py`
-- MCP remote HTTP transport: `src/nightledger_api/mcp_remote_server.py`
-- Shared MCP protocol core: `src/nightledger_api/mcp_protocol.py`
+- API runtime app:
+  [`src/nightledger_api/main.py`](../src/nightledger_api/main.py)
+- MCP stdio:
+  [`src/nightledger_api/mcp_server.py`](../src/nightledger_api/mcp_server.py)
+- MCP remote HTTP transport:
+  [`src/nightledger_api/mcp_remote_server.py`](../src/nightledger_api/mcp_remote_server.py)
+- Shared MCP protocol core:
+  [`src/nightledger_api/mcp_protocol.py`](../src/nightledger_api/mcp_protocol.py)
 
 ## Step-by-Step: Integrate and Implement Against NightLedger
 
