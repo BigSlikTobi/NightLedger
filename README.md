@@ -5,6 +5,19 @@
 This codebase is the result of my 5-day hackathon executed with my OpenClaw
 agent, `Deborrabotter`.
 
+### Technical Problem I Wanted to Solve
+
+Current agent tooling is strong at execution but weak at accountability:
+
+1. Autonomous actions can happen without immutable receipts.
+2. High-risk steps are often gated by ad-hoc prompts instead of enforceable
+   runtime policy.
+3. Human approval is frequently disconnected from the exact decision context.
+4. Integrations often lack deterministic contracts for pause/resume behavior.
+
+This hackathon focused on solving that systems gap by building a runtime layer
+that is append-only, policy-gated, approval-aware, and contract-driven.
+
 The assumption tested was simple:
 
 > If autonomous systems must show their work before real-world impact,
