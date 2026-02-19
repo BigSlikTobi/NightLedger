@@ -1,6 +1,6 @@
 # <img src="docs/images/nightledger_logo.png" width="80" alt="NightLedger 3D Logo" /> NightLedger: Autonomy with Receipts.
 
-## Hackathon Narrative (Last 5 Days)
+## 5 Day Hackathon Mode On!
 
 This codebase is the result of my 5-day hackathon executed with my OpenClaw
 agent, `Deborahbot`.
