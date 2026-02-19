@@ -1,7 +1,7 @@
 # NightLedger Technical Guide
 
-This document is my technical deep dive for NightLedger.
-I implemented this hackathon with my OpenClaw agent `Deborrabotter`.
+This document is the technical deep dive for NightLedger. I implemented this
+hackathon with my OpenClaw agent `Deborahbot`.
 
 Vision/MVP/hackathon narrative lives in [`README.md`](../README.md).
 
@@ -48,8 +48,7 @@ Primary concern: project immutable data into human-readable state.
   [`src/nightledger_api/services/run_status_service.py`](../src/nightledger_api/services/run_status_service.py).
 - Journal projection in
   [`src/nightledger_api/services/journal_projection_service.py`](../src/nightledger_api/services/journal_projection_service.py).
-- UI model/controller/view in
-  [`apps/web/model`](../apps/web/model),
+- UI model/controller/view in [`apps/web/model`](../apps/web/model),
   [`apps/web/controller`](../apps/web/controller), and
   [`apps/web/view`](../apps/web/view).
 
@@ -85,14 +84,12 @@ This is the production-facing contract for a real bot integration using
 1. Bot calls MCP `authorize_action`.
 2. If decision is `allow`, bot proceeds.
 3. If decision is `requires_approval`, bot pauses fail-closed.
-4. Bot explicitly registers pending approval:
-   `POST /v1/approvals/requests`.
+4. Bot explicitly registers pending approval: `POST /v1/approvals/requests`.
 5. User approves/rejects in UI (`/view/?mode=live&runId=<run_id>&apiBase=...`).
 6. Bot polls `GET /v1/approvals/decisions/{decision_id}`.
 7. If approved, bot mints token:
    `POST /v1/approvals/decisions/{decision_id}/execution-token`.
-8. Bot executes with token:
-   `POST /v1/executors/purchase.create`.
+8. Bot executes with token: `POST /v1/executors/purchase.create`.
 
 No simulation is required for this flow. OpenClaw (or any independent bot)
 should implement these contract steps directly.
@@ -124,7 +121,13 @@ curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
 ```
 
 ```json
-{"decision_id":"dec_...","state":"allow","reason_code":"POLICY_ALLOW_WITHIN_THRESHOLD","execution_token":"<signed-token>","execution_token_expires_at":"2026-02-18T12:05:00Z"}
+{
+  "decision_id": "dec_...",
+  "state": "allow",
+  "reason_code": "POLICY_ALLOW_WITHIN_THRESHOLD",
+  "execution_token": "<signed-token>",
+  "execution_token_expires_at": "2026-02-18T12:05:00Z"
+}
 ```
 
 Requires approval response (`amount` above threshold):
@@ -136,7 +139,11 @@ curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
 ```
 
 ```json
-{"decision_id":"dec_...","state":"requires_approval","reason_code":"AMOUNT_ABOVE_THRESHOLD"}
+{
+  "decision_id": "dec_...",
+  "state": "requires_approval",
+  "reason_code": "AMOUNT_ABOVE_THRESHOLD"
+}
 ```
 
 Invalid payload example (`intent.action` not supported):
@@ -148,7 +155,12 @@ curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
 ```
 
 ```json
-{"error":{"code":"REQUEST_VALIDATION_ERROR","details":[{"path":"intent.action","code":"UNSUPPORTED_ACTION"}]}}
+{
+  "error": {
+    "code": "REQUEST_VALIDATION_ERROR",
+    "details": [{ "path": "intent.action", "code": "UNSUPPORTED_ACTION" }]
+  }
+}
 ```
 
 ### MCP stdio server wrapper
@@ -338,18 +350,18 @@ One command boots API + MCP runtime for local adoption flows:
 bash tasks/bootstrap_nightledger_runtime.sh
 ```
 
-This path is designed to prove setup -> connect -> call tool in under 10 minutes,
-including both API + MCP process startup.
+This path is designed to prove setup -> connect -> call tool in under 10
+minutes, including both API + MCP process startup.
 
 ## Adoption v1 demo flow (under 10 minutes)
 
-1) Start both services:
+1. Start both services:
 
 ```bash
 bash tasks/bootstrap_nightledger_runtime.sh
 ```
 
-2) Initialize MCP session:
+2. Initialize MCP session:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8002/v1/mcp/remote \
@@ -359,7 +371,7 @@ curl -sS -X POST http://127.0.0.1:8002/v1/mcp/remote \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"adoption-demo","version":"0.1.0"}}}'
 ```
 
-3) List tools:
+3. List tools:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8002/v1/mcp/remote \
@@ -371,7 +383,7 @@ curl -sS -X POST http://127.0.0.1:8002/v1/mcp/remote \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
 ```
 
-4) Call authorize_action:
+4. Call authorize_action:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8002/v1/mcp/remote \
@@ -388,14 +400,14 @@ curl -sS -X POST http://127.0.0.1:8002/v1/mcp/remote \
 Use terminal requests for policy evaluation and keep UI focused on approval
 state projection.
 
-1) Start API with threshold `100`:
+1. Start API with threshold `100`:
 
 ```bash
 NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR=100 \
 PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --port 8001
 ```
 
-2) Send policy decision requests:
+2. Send policy decision requests:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
@@ -409,13 +421,14 @@ curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_80","amount":80,"currency":"EUR"}}'
 ```
 
-3) Inspect pending approvals (UI reads from this endpoint):
+3. Inspect pending approvals (UI reads from this endpoint):
 
 ```bash
 curl -sS http://127.0.0.1:8001/v1/approvals/pending
 ```
 
 Notes:
+
 - `authorize_action` returns decisions; it does not append timeline receipts by
   itself.
 - To visualize custom scenarios in live UI/journal, append matching
@@ -437,16 +450,14 @@ Legacy compatibility:
 
 NightLedger enforces a hard runtime trust boundary for `purchase.create`.
 
-1. Policy decision:
-   `POST /v1/mcp/authorize_action` returns `allow` or `requires_approval`.
-   Include `context.run_id` to bind generated runtime receipts to a specific
-   live timeline run.
+1. Policy decision: `POST /v1/mcp/authorize_action` returns `allow` or
+   `requires_approval`. Include `context.run_id` to bind generated runtime
+   receipts to a specific live timeline run.
 2. Approval token minting:
-   `POST /v1/approvals/decisions/{decision_id}/execution-token` returns a short-lived
-   `execution_token` only when the decision is approved and binds token to the
-   requested purchase payload (`amount`, `currency`, `merchant`).
-3. Protected execution:
-   `POST /v1/executors/purchase.create` requires
+   `POST /v1/approvals/decisions/{decision_id}/execution-token` returns a
+   short-lived `execution_token` only when the decision is approved and binds
+   token to the requested purchase payload (`amount`, `currency`, `merchant`).
+3. Protected execution: `POST /v1/executors/purchase.create` requires
    `Authorization: Bearer <execution_token>`.
 
 Fail-closed behavior:

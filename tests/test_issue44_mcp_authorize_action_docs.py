@@ -15,12 +15,12 @@ def test_issue44_readme_includes_mcp_authorize_action_examples() -> None:
     assert "POST /v1/mcp/authorize_action" in readme
     assert '"transport_decision_hint":"allow"' in readme
     assert '"transport_decision_hint":"deny"' in readme
-    assert '"state":"allow"' in readme
-    assert '"state":"requires_approval"' in readme
-    assert '"reason_code":"POLICY_ALLOW_WITHIN_THRESHOLD"' in readme
-    assert '"reason_code":"AMOUNT_ABOVE_THRESHOLD"' in readme
-    assert '"code":"REQUEST_VALIDATION_ERROR"' in readme
-    assert '"code":"UNSUPPORTED_ACTION"' in readme
+    assert '"state":"allow"' in readme or '"state": "allow"' in readme
+    assert '"state":"requires_approval"' in readme or '"state": "requires_approval"' in readme
+    assert '"reason_code":"POLICY_ALLOW_WITHIN_THRESHOLD"' in readme or '"reason_code": "POLICY_ALLOW_WITHIN_THRESHOLD"' in readme
+    assert '"reason_code":"AMOUNT_ABOVE_THRESHOLD"' in readme or '"reason_code": "AMOUNT_ABOVE_THRESHOLD"' in readme
+    assert '"code":"REQUEST_VALIDATION_ERROR"' in readme or '"code": "REQUEST_VALIDATION_ERROR"' in readme
+    assert '"code":"UNSUPPORTED_ACTION"' in readme or '"code": "UNSUPPORTED_ACTION"' in readme
     assert "### MCP stdio server wrapper" in readme
     assert "python -m nightledger_api.mcp_server" in readme
 

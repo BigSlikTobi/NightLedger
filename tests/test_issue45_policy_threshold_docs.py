@@ -43,8 +43,8 @@ def test_issue45_readme_documents_policy_inputs_and_outcomes() -> None:
     assert "amount\":101" in readme
     assert "\"currency\":\"EUR\"" in readme
     assert "transport_decision_hint" in readme
-    assert "\"reason_code\":\"AMOUNT_ABOVE_THRESHOLD\"" in readme
-    assert "\"reason_code\":\"POLICY_ALLOW_WITHIN_THRESHOLD\"" in readme
+    assert "\"reason_code\":\"AMOUNT_ABOVE_THRESHOLD\"" in readme or "\"reason_code\": \"AMOUNT_ABOVE_THRESHOLD\"" in readme
+    assert "\"reason_code\":\"POLICY_ALLOW_WITHIN_THRESHOLD\"" in readme or "\"reason_code\": \"POLICY_ALLOW_WITHIN_THRESHOLD\"" in readme
     assert "## Policy Threshold Operator Flow (Issue #45)" in readme
     assert "/v1/mcp/authorize_action" in readme
     assert "/v1/approvals/pending" in readme

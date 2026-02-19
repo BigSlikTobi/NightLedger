@@ -3,9 +3,11 @@
 ## Hackathon Narrative (Last 5 Days)
 
 This codebase is the result of my 5-day hackathon executed with my OpenClaw
-agent, `Deborrabotter`.
+agent, `Deborahbot`.
 
-### Technical Problem I Wanted to Solve
+<img src="docs/images/deborahbot.png" width="80" alt="Deborahbot" />
+
+### Technical Problem We Wanted to Solve
 
 Current agent tooling is strong at execution but weak at accountability:
 
@@ -20,8 +22,8 @@ that is append-only, policy-gated, approval-aware, and contract-driven.
 
 The assumption tested was simple:
 
-> If autonomous systems must show their work before real-world impact,
-> autonomy can be deployed with trust instead of blind faith.
+> If autonomous systems must show their work before real-world impact, autonomy
+> can be deployed with trust instead of blind faith.
 
 The goal was to prove or disprove that assumption through running software,
 contract tests, and deterministic demos.
@@ -59,7 +61,7 @@ For complete history and current status:
 
 ## High-Level Outcome
 
-What I implemented:
+What We implemented:
 
 1. Append-only runtime accountability.
 2. Governance gates for risky actions.
@@ -124,13 +126,13 @@ node --test model/*.test.js controller/*.test.js view/*.test.js
 
 ### Local Runtime
 
-1) Start API (Terminal A):
+1. Start API (Terminal A):
 
 ```bash
 PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --reload --port 8001
 ```
 
-2) Start web UI (Terminal B):
+2. Start web UI (Terminal B):
 
 ```bash
 npm --prefix apps/web start
@@ -152,27 +154,27 @@ bash tasks/smoke_purchase_enforcement_demo.sh
 
 ## Canonical Sources of Truth
 
-| Concern | Canonical source |
-| --- | --- |
-| Runtime behavior and layer boundaries | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
-| HTTP API contract and error envelopes | [`spec/API.md`](spec/API.md) |
-| Event payload schema contract | [`spec/EVENT_SCHEMA.md`](spec/EVENT_SCHEMA.md) |
+| Concern                               | Canonical source                                   |
+| ------------------------------------- | -------------------------------------------------- |
+| Runtime behavior and layer boundaries | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)     |
+| HTTP API contract and error envelopes | [`spec/API.md`](spec/API.md)                       |
+| Event payload schema contract         | [`spec/EVENT_SCHEMA.md`](spec/EVENT_SCHEMA.md)     |
 | Governance/risk/approval rule catalog | [`spec/BUSINESS_RULES.md`](spec/BUSINESS_RULES.md) |
 
 ## Documentation Map
 
-| Doc | Purpose |
-| --- | --- |
-| [`README.md`](README.md) | Vision, MVP, and hackathon context |
-| [`docs/TECHNICAL_GUIDE.md`](docs/TECHNICAL_GUIDE.md) | Full conceptual + technical deep dive |
-| [`spec/MVP/discovery.md`](spec/MVP/discovery.md) | Strategy and problem framing |
-| [`spec/MVP/MVP.md`](spec/MVP/MVP.md) | MVP scope and success criteria |
-| [`spec/MVP/product_design.md`](spec/MVP/product_design.md) | Layered design principles |
-| [`spec/MVP/roadmap.md`](spec/MVP/roadmap.md) | Current execution roadmap |
-| [`docs/API_TESTING.md`](docs/API_TESTING.md) | Local API smoke flows |
-| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | Reproducible demo handoff path |
+| Doc                                                        | Purpose                               |
+| ---------------------------------------------------------- | ------------------------------------- |
+| [`README.md`](README.md)                                   | Vision, MVP, and hackathon context    |
+| [`docs/TECHNICAL_GUIDE.md`](docs/TECHNICAL_GUIDE.md)       | Full conceptual + technical deep dive |
+| [`spec/MVP/discovery.md`](spec/MVP/discovery.md)           | Strategy and problem framing          |
+| [`spec/MVP/MVP.md`](spec/MVP/MVP.md)                       | MVP scope and success criteria        |
+| [`spec/MVP/product_design.md`](spec/MVP/product_design.md) | Layered design principles             |
+| [`spec/MVP/roadmap.md`](spec/MVP/roadmap.md)               | Current execution roadmap             |
+| [`docs/API_TESTING.md`](docs/API_TESTING.md)               | Local API smoke flows                 |
+| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)               | Reproducible demo handoff path        |
 | [`docs/SHOWCASE_E2E_SETUP.md`](docs/SHOWCASE_E2E_SETUP.md) | End-to-end showcase operator playbook |
-| [`docs/REPO_HYGIENE.md`](docs/REPO_HYGIENE.md) | Branch/artifact hygiene policy |
+| [`docs/REPO_HYGIENE.md`](docs/REPO_HYGIENE.md)             | Branch/artifact hygiene policy        |
 
 ## Technical Deep Dive
 
