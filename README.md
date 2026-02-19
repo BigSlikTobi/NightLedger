@@ -2,8 +2,8 @@
 
 ## Hackathon Narrative (Last 5 Days)
 
-This codebase is the result of a 5-day hackathon executed by Tobias Latta with
-his OpenClaw agent, `Deborrabotter`.
+This codebase is the result of my 5-day hackathon executed with my OpenClaw
+agent, `Deborrabotter`.
 
 The assumption tested was simple:
 
@@ -24,7 +24,7 @@ Result at MVP scope: this hypothesis is supported by the implemented flows.
 
 ## How This Was Built (agents.md)
 
-Development followed the repo constitution in `agents.md`:
+I followed the repo constitution in `agents.md`:
 
 1. Docs-first for behavior changes.
 2. TDD-first (failing tests before implementation).
@@ -36,7 +36,7 @@ Development followed the repo constitution in `agents.md`:
 
 ## Issues and Context
 
-Hackathon execution was issue-sliced and tracked in GitHub.
+I executed the hackathon as issue-sliced delivery tracked in GitHub.
 
 For complete history and current status:
 
@@ -46,7 +46,7 @@ For complete history and current status:
 
 ## High-Level Outcome
 
-What was implemented:
+What I implemented:
 
 1. Append-only runtime accountability.
 2. Governance gates for risky actions.

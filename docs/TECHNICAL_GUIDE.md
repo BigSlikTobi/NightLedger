@@ -1,8 +1,7 @@
 # NightLedger Technical Guide
 
-This document is the technical deep dive for NightLedger.
-Implementation authorship for this hackathon: Tobias Latta + OpenClaw agent
-`Deborrabotter`.
+This document is my technical deep dive for NightLedger.
+I implemented this hackathon with my OpenClaw agent `Deborrabotter`.
 
 Vision/MVP/hackathon narrative lives in `/README.md`.
 
