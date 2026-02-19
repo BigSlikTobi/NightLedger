@@ -18,7 +18,7 @@ def test_issue76_sub_issue_artifact_exists_with_expected_sections() -> None:
 
 
 def test_issue76_readme_documents_adoption_quickstart_and_demo_window() -> None:
-    readme = _read("README.md")
+    readme = _read("docs/TECHNICAL_GUIDE.md")
     assert "## Adoption v1 Quickstart (Issue #76)" in readme
     assert "bash tasks/bootstrap_nightledger_runtime.sh" in readme
     assert "under 10 minutes" in readme
@@ -56,7 +56,7 @@ def test_issue76_bootstrap_script_dry_run_includes_api_and_mcp_start_commands() 
 
 
 def test_issue76_readme_includes_local_stdio_and_remote_client_config_examples() -> None:
-    readme = _read("README.md")
+    readme = _read("docs/TECHNICAL_GUIDE.md")
     assert "Claude Desktop (local stdio)" in readme
     assert '"command": "/Users/' in readme
     assert "nightledger_api.mcp_server" in readme
@@ -66,7 +66,7 @@ def test_issue76_readme_includes_local_stdio_and_remote_client_config_examples()
 
 
 def test_issue76_readme_includes_under_10_minute_demo_flow() -> None:
-    readme = _read("README.md")
+    readme = _read("docs/TECHNICAL_GUIDE.md")
     assert "## Adoption v1 demo flow (under 10 minutes)" in readme
     assert "bootstrap_nightledger_runtime.sh" in readme
     assert '"method":"initialize"' in readme

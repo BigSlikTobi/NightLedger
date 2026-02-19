@@ -2292,3 +2292,49 @@ state, and add event-store persistence option.
   provided `run_id`.
 - Operators can persist runtime events across restarts using sqlite backend
   config, reducing demo drift from in-memory resets.
+
+---
+
+## 🗓️ 2026-02-19: Issue #62 Parent Cleanup Closure (SI-62A/SI-62B)
+
+### Objective
+
+Close remaining parent cleanup scope in issue #62 by enforcing progress issue
+references and operationalizing branch hygiene in a non-destructive workflow.
+
+### SI-62A (Issue #88): Progress issue-link policy
+
+- Added PR template requirement for linked issue format `#<number>`.
+- Added validator command: `bash tasks/validate_progress_issue_links.sh`.
+- Added CI gate `validate-progress-refs` to enforce tracked progress artifact
+  issue-reference rules.
+- Added policy document: `docs/PROGRESS_UPDATE_POLICY.md`.
+
+### SI-62B (Issue #89): Branch hygiene operationalization
+
+- Added dry-run inventory command: `bash tasks/branch_hygiene_inventory.sh`.
+- Added branch hygiene inventory workflow documentation and execution artifact.
+- Script outputs merged/non-merged branch lists and deletion command templates.
+- Script excludes protected refs (`origin/main`, `origin/HEAD`, `origin`) and
+  does not execute remote deletions.
+- Added snapshot artifact:
+  `docs/artifacts/issue-62/branch_inventory_snapshot.md`.
+
+### Parent reconciliation
+
+- Added parent closure artifacts:
+  - `docs/artifacts/issue-62/sub_issues.md`
+  - `docs/artifacts/issue-62/gap_assessment.md`
+- Mapped post-MVP open scope to #84/#85/#86 and kept README update as an
+  explicit open point.
+
+### Validation evidence
+
+- `PYTHONPATH=src ./.venv/bin/pytest -q`
+- `cd apps/web && node --test model/*.test.js controller/*.test.js`
+
+### Findings
+
+- Issue #62 process and hygiene residuals are now tracked with enforceable,
+  auditable workflows.
+- Runtime API contracts remained unchanged in this closure pass.

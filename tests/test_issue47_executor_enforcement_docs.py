@@ -18,7 +18,7 @@ def test_issue47_api_docs_include_execution_token_and_executor_endpoints() -> No
 
 
 def test_issue47_readme_docs_include_executor_trust_boundary_flow() -> None:
-    readme = _load("README.md")
+    readme = _load("docs/TECHNICAL_GUIDE.md")
 
     assert "## Token-Gated Executor Flow (Issue #47)" in readme
     assert "POST /v1/executors/purchase.create" in readme

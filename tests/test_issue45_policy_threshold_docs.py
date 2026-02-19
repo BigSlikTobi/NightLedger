@@ -36,15 +36,15 @@ def test_issue45_api_spec_documents_policy_threshold_contract() -> None:
 
 
 def test_issue45_readme_documents_policy_inputs_and_outcomes() -> None:
-    readme = _load("README.md")
+    readme = _load("docs/TECHNICAL_GUIDE.md")
 
     assert "Policy rule (Issue #45 sub-issue 1):" in readme
     assert "amount\":100" in readme
     assert "amount\":101" in readme
     assert "\"currency\":\"EUR\"" in readme
     assert "transport_decision_hint" in readme
-    assert "\"reason_code\":\"AMOUNT_ABOVE_THRESHOLD\"" in readme
-    assert "\"reason_code\":\"POLICY_ALLOW_WITHIN_THRESHOLD\"" in readme
+    assert "\"reason_code\":\"AMOUNT_ABOVE_THRESHOLD\"" in readme or "\"reason_code\": \"AMOUNT_ABOVE_THRESHOLD\"" in readme
+    assert "\"reason_code\":\"POLICY_ALLOW_WITHIN_THRESHOLD\"" in readme or "\"reason_code\": \"POLICY_ALLOW_WITHIN_THRESHOLD\"" in readme
     assert "## Policy Threshold Operator Flow (Issue #45)" in readme
     assert "/v1/mcp/authorize_action" in readme
     assert "/v1/approvals/pending" in readme
