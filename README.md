@@ -13,8 +13,8 @@ explicit before high-risk actions execute.
 ## 60-second proof
 
 **What happened**
-- A run emits structured runtime events (`/v1/events`) and projects them into a
-  human-readable timeline (`/v1/runs/{run_id}/journal`).
+- A run emits structured runtime events via `POST /v1/events`; operators view
+  them as a human-readable timeline via `GET /v1/runs/{run_id}/journal`.
 
 **What got blocked**
 - A risky action transitions to `requires_approval`; execution pauses fail-closed
