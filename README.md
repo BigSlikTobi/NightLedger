@@ -6,8 +6,8 @@ explicit before high-risk actions execute.
 
 ## Vision, Mission, and MVP (at a glance)
 
-- **Vision:** autonomy without opacity; governance without friction; trust by design.
-- **Mission:** make autonomous execution auditable, policy-enforced, and human-supervisable in real time.
+- **Vision:** *The world runs on autonomous systems — safe, transparent, and accountable by default.*
+- **Mission:** *Build the accountability infrastructure for the autonomous era.*
 - **MVP:** prove one deterministic control loop from event capture to approval-gated resume.
 
 ## 60-second proof
