@@ -4,6 +4,12 @@ NightLedger is a lightweight runtime accountability layer for AI agents.
 It captures append-only receipts, enforces risk gates, and makes approvals
 explicit before high-risk actions execute.
 
+## Built together
+
+This repo was built together by **Tobi** and his OpenClaw agent **Deborahbot**.
+
+<img src="docs/images/Deborahbot.png" width="80" alt="Deborahbot" />
+
 ## Vision, Mission, and MVP (at a glance)
 
 - **Vision:** *The world runs on autonomous systems — safe, transparent, and accountable by default.*
