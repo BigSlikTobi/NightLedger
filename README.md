@@ -4,6 +4,12 @@ NightLedger is a lightweight runtime accountability layer for AI agents.
 It captures append-only receipts, enforces risk gates, and makes approvals
 explicit before high-risk actions execute.
 
+## Vision, Mission, and MVP (at a glance)
+
+- **Vision:** autonomy without opacity; governance without friction; trust by design.
+- **Mission:** make autonomous execution auditable, policy-enforced, and human-supervisable in real time.
+- **MVP:** prove one deterministic control loop from event capture to approval-gated resume.
+
 ## 60-second proof
 
 **What happened**
@@ -28,7 +34,15 @@ explicit before high-risk actions execute.
 | Operator UX | Raw technical records | Journal/timeline projection for non-authors |
 | Bot integration | Ad-hoc behavior | Deterministic API + MCP contract boundaries |
 
-## MVP loop (implemented)
+## Deconstructing Vision and MVP for Readers
+
+### Vision
+
+NightLedger is an accountability layer for the agentic era: autonomy with receipts.
+
+### MVP
+
+The MVP proves one full control loop:
 
 1. Start run
 2. Capture events
@@ -44,7 +58,7 @@ explicit before high-risk actions execute.
 - **Approval loop is explicit:** unresolved decisions fail execution-token mint
   with `409 EXECUTION_DECISION_NOT_APPROVED`; mint succeeds only after approval.
 - **One-command reproducibility:** deterministic `block -> approve -> execute`
-  smoke flow available via `tasks/smoke_purchase_enforcement_demo.sh`.
+  smoke flow available via `tasks/smoke_purchase_enforcement_demo.sh` (**Issue #49**).
 
 ## Quick start
 
@@ -56,7 +70,7 @@ python -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 ```
 
-## Local verification (matches CI)
+## Local Verification (Matches CI)
 
 ```bash
 ./.venv/bin/pytest -q
@@ -84,7 +98,7 @@ Open:
 http://localhost:3000/view/?mode=live&runId=run_triage_inbox_demo_1&apiBase=http://127.0.0.1:8001
 ```
 
-## Deterministic purchase enforcement demo
+## Deterministic purchase enforcement demo (Issue #49)
 
 Run the `block -> approve -> execute` proof path:
 
@@ -92,7 +106,7 @@ Run the `block -> approve -> execute` proof path:
 bash tasks/smoke_purchase_enforcement_demo.sh
 ```
 
-## Canonical sources of truth
+## Canonical Sources of Truth
 
 | Concern | Canonical source |
 | --- | --- |
@@ -116,7 +130,7 @@ bash tasks/smoke_purchase_enforcement_demo.sh
 | [`docs/SHOWCASE_E2E_SETUP.md`](docs/SHOWCASE_E2E_SETUP.md) | End-to-end showcase operator playbook |
 | [`docs/REPO_HYGIENE.md`](docs/REPO_HYGIENE.md) | Branch/artifact hygiene policy |
 
-## Hackathon context
+## Hackathon Narrative (Last 5 Days)
 
 This project originated in a 5-day hackathon built with OpenClaw + `Deborahbot`.
 The build process and issue-sliced execution history are preserved in:
