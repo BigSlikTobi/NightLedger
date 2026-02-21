@@ -20,6 +20,7 @@ from nightledger_api.services.authorize_action_service import (
     AuthorizeActionRequest,
     RunFacts,
     evaluate_authorize_action,
+    get_policy_catalog,
 )
 from nightledger_api.services.audit_export_service import export_decision_audit
 from nightledger_api.services.business_rules_service import validate_event_business_rules
@@ -359,6 +360,11 @@ def authorize_action(
         "execution_token": token,
         "execution_token_expires_at": expires_at,
     }
+
+
+@router.get("/v1/policy/catalog", status_code=status.HTTP_200_OK)
+def policy_catalog(user_id: str | None = None) -> dict[str, Any]:
+    return get_policy_catalog(user_id=user_id)
 
 
 @router.post("/v1/events", status_code=status.HTTP_201_CREATED)

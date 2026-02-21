@@ -30,6 +30,7 @@ from nightledger_api.presenters.error_presenter import (
     present_rule_configuration_error,
     present_rule_expression_error,
     present_rule_input_error,
+    present_policy_catalog_version_mismatch_error,
 )
 from nightledger_api.services.errors import (
     AmbiguousEventIdError,
@@ -54,6 +55,7 @@ from nightledger_api.services.errors import (
     RuleConfigurationError,
     RuleExpressionError,
     RuleInputError,
+    PolicyCatalogVersionMismatchError,
 )
 
 
@@ -337,3 +339,13 @@ async def handle_rule_input_error(
         content=present_rule_input_error(exc),
     )
 
+
+@app.exception_handler(PolicyCatalogVersionMismatchError)
+async def handle_policy_catalog_version_mismatch_error(
+    request: Request, exc: PolicyCatalogVersionMismatchError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=present_policy_catalog_version_mismatch_error(exc),
+    )

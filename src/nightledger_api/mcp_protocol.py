@@ -10,7 +10,9 @@ from nightledger_api.services.authorize_action_service import (
     AUTHORIZE_ACTION_CONTRACT_VERSION,
     AuthorizeActionRequest,
     evaluate_authorize_action,
+    get_policy_catalog,
 )
+from nightledger_api.services.errors import RuleConfigurationError
 
 
 MCP_PROTOCOL_VERSION = "2025-06-18"
@@ -102,6 +104,7 @@ class MCPServer:
 
 
 def authorize_action_tool_definition() -> dict[str, Any]:
+    policy_catalog_metadata = _policy_catalog_metadata()
     return {
         "name": "authorize_action",
         "description": (
@@ -113,6 +116,7 @@ def authorize_action_tool_definition() -> dict[str, Any]:
             "version": AUTHORIZE_ACTION_CONTRACT_VERSION,
             "compatibility": "breaking-change",
         },
+        "x-nightledger-policy-catalog": policy_catalog_metadata,
         "inputSchema": {
             "type": "object",
             "additionalProperties": False,
@@ -142,6 +146,24 @@ def authorize_action_tool_definition() -> dict[str, Any]:
                 },
             },
         },
+    }
+
+
+def _policy_catalog_metadata() -> dict[str, Any]:
+    try:
+        catalog = get_policy_catalog()
+    except RuleConfigurationError as exc:
+        return {
+            "status": "unavailable",
+            "error_code": "RULE_CONFIGURATION_ERROR",
+            "message": str(exc),
+        }
+
+    return {
+        "status": "ready",
+        "policy_set": catalog["policy_set"],
+        "catalog_version": catalog["catalog_version"],
+        "protected_actions": catalog["protected_actions"],
     }
 
 

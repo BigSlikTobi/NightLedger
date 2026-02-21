@@ -25,6 +25,7 @@ from nightledger_api.services.errors import (
     RuleConfigurationError,
     RuleExpressionError,
     RuleInputError,
+    PolicyCatalogVersionMismatchError,
 )
 
 
@@ -492,6 +493,27 @@ def present_rule_input_error(exc: RuleInputError) -> dict[str, Any]:
                     "message": str(exc),
                     "type": "missing",
                     "code": "MISSING_RULE_INPUT",
+                }
+            ],
+        }
+    }
+
+
+def present_policy_catalog_version_mismatch_error(
+    exc: PolicyCatalogVersionMismatchError,
+) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "POLICY_CATALOG_VERSION_MISMATCH",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "context.policy_catalog_version",
+                    "message": str(exc),
+                    "type": "state_conflict",
+                    "code": "POLICY_CATALOG_VERSION_MISMATCH",
+                    "expected": exc.expected,
+                    "actual": exc.actual,
                 }
             ],
         }

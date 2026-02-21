@@ -67,14 +67,16 @@ Primary concern: project immutable data into human-readable state.
 
 Implementation flow for real bot runtimes:
 
-1. Call `authorize_action` over MCP or HTTP.
-2. If decision is `allow`, proceed.
-3. If decision is `requires_approval`, pause fail-closed.
-4. Register pending approval and surface it to human operator UI.
-5. Poll decision endpoint until approved/rejected.
-6. If approved, mint execution token.
-7. Execute protected side effect with token.
-8. Export audit receipts when needed.
+1. Fetch policy catalog (`GET /v1/policy/catalog`) and cache
+   `catalog_version` for the run.
+2. Call `authorize_action` over MCP or HTTP.
+3. If decision is `allow`, proceed.
+4. If decision is `requires_approval`, pause fail-closed.
+5. Register pending approval and surface it to human operator UI.
+6. Poll decision endpoint until approved/rejected.
+7. If approved, mint execution token.
+8. Execute protected side effect with token.
+9. Export audit receipts when needed.
 
 ## Real bot workflow (Issue #49 v1)
 

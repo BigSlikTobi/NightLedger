@@ -46,6 +46,27 @@ Optional context fields:
 - `run_id`: when supplied, runtime decision/token/execution receipts are
   appended to that run and become available in journal/status projections.
 - `merchant`: optional merchant descriptor used for payload-bound token hash.
+- `policy_catalog_version`: optional run pin for deterministic policy
+  application. If provided and stale, runtime returns
+  `POLICY_CATALOG_VERSION_MISMATCH`.
+
+## GET /v1/policy/catalog
+
+Fetch the current policy catalog so agent runtimes can deterministically map
+protected actions before executing a run.
+
+Behavior:
+
+- Valid request: `200 OK`
+- Optional query: `user_id` (restrict catalog to one user entry)
+
+Response includes:
+
+- `policy_set`
+- `catalog_version`
+- `ruleset_hash`
+- `protected_actions`
+- per-user `actions` with `rule_ids` and `required_context_fields`
 
 ## Bot pause/wait/resume contract (Issue #49 v1)
 

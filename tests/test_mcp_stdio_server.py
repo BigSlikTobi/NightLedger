@@ -86,6 +86,10 @@ def test_mcp_tools_list_exposes_authorize_action_contract() -> None:
     assert "amount" in context_schema["properties"]
     assert "currency" in context_schema["properties"]
     assert "user_id" in context_schema["required"]
+    policy_catalog = tool["x-nightledger-policy-catalog"]
+    assert policy_catalog["status"] == "ready"
+    assert policy_catalog["catalog_version"].startswith("pol_")
+    assert "purchase.create" in policy_catalog["protected_actions"]
 
 
 def test_mcp_tools_call_returns_allow_when_no_rule_matches() -> None:

@@ -2380,3 +2380,32 @@ and returns matched rule metadata in each decision (`matched_rule_ids`,
   `context.user_id`.
 - A strict AST validator initially rejected valid comparison operators;
   allowing comparison-op AST nodes fixed evaluation while keeping the DSL safe.
+
+## 🗓️ 2026-02-20: Policy Catalog Bootstrap + Run-Level Pinning
+
+Implemented deterministic policy bootstrap support so agents can discover
+protected actions from NightLedger at run start and pin policy version during
+execution.
+
+### What was added
+
+- New policy catalog endpoint:
+  - `GET /v1/policy/catalog`
+  - Optional `user_id` filter
+  - Returns `policy_set`, `catalog_version`, `ruleset_hash`, and per-user action
+    requirements (`rule_ids`, `required_context_fields`).
+- MCP tool metadata now surfaces policy bootstrap info in `tools/list`:
+  - `x-nightledger-policy-catalog` with `catalog_version` and
+    `protected_actions`.
+- Run-level determinism guard:
+  - `authorize_action` now accepts optional `context.policy_catalog_version`.
+  - If stale, runtime rejects with
+    `POLICY_CATALOG_VERSION_MISMATCH` (`409`).
+
+### Validation
+
+- Added/updated tests:
+  - `tests/test_policy_catalog_api.py`
+  - `tests/test_mcp_stdio_server.py` metadata assertions
+- Full suite: `./.venv/bin/pytest -q`
+- Result: `346 passed`

@@ -145,12 +145,26 @@ Open:
 http://localhost:3000/view/?mode=live&runId=run_triage_inbox_demo_1&apiBase=http://127.0.0.1:8001
 ```
 
-3. Validate `authorize_action` with user-local policy (Terminal C):
+3. Fetch policy catalog first (Terminal C):
+
+```bash
+curl -sS "http://127.0.0.1:8001/v1/policy/catalog?user_id=user_123"
+```
+
+Use the response to drive deterministic agent behavior:
+
+- Read `protected_actions`.
+- If an operation maps to an action in `protected_actions`, the agent must call
+  `authorize_action` before execution.
+- Cache `catalog_version` at run start and pass it as
+  `context.policy_catalog_version` on every `authorize_action` call.
+
+4. Validate `authorize_action` with user-local policy (Terminal C):
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"purchase.create"},"context":{"user_id":"user_123","request_id":"req_readme_demo","amount":101,"currency":"EUR","merchant":"ACME GmbH"}}'
+  -d '{"intent":{"action":"purchase.create"},"context":{"user_id":"user_123","policy_catalog_version":"pol_...","request_id":"req_readme_demo","amount":101,"currency":"EUR","merchant":"ACME GmbH"}}'
 ```
 
 Expected behavior in v2:
@@ -158,6 +172,8 @@ Expected behavior in v2:
 - `context.user_id` is required.
 - Decision comes from user-local YAML rules (`NIGHTLEDGER_USER_RULES_FILE`).
 - Response includes `matched_rule_ids` and `matched_reasons`.
+- If `context.policy_catalog_version` is stale, NightLedger rejects with
+  `POLICY_CATALOG_VERSION_MISMATCH`.
 
 ### Deterministic purchase enforcement demo (Issue #49)
 
