@@ -181,3 +181,11 @@ class RuleInputError(Exception):
         self.path = path
         super().__init__(message)
 
+
+class PolicyCatalogVersionMismatchError(Exception):
+    def __init__(self, *, expected: str, actual: str) -> None:
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            f"Policy catalog version mismatch: expected '{expected}', current '{actual}'"
+        )

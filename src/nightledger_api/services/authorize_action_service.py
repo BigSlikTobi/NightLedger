@@ -10,6 +10,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from nightledger_api.services.errors import (
+    PolicyCatalogVersionMismatchError,
     RuleConfigurationError,
     RuleExpressionError,
     RuleInputError,
@@ -20,6 +21,7 @@ AuthorizeActionState = Literal["allow", "requires_approval", "deny"]
 RuleAction = Literal["allow", "require_approval", "deny"]
 _USER_RULES_FILE_ENV = "NIGHTLEDGER_USER_RULES_FILE"
 AUTHORIZE_ACTION_CONTRACT_VERSION = "2.0.0"
+_POLICY_SET = "nightledger-v2-user-local"
 
 
 class AuthorizeActionIntent(BaseModel):
@@ -35,6 +37,7 @@ class AuthorizeActionContext(BaseModel):
     amount: float
     currency: Literal["EUR"]
     transport_decision_hint: AuthorizeActionState | None = None
+    policy_catalog_version: str | None = None
 
 
 class AuthorizeActionRequest(BaseModel):
@@ -66,17 +69,28 @@ class MatchResult:
     outcome: bool
 
 
+@dataclass(frozen=True)
+class LoadedRules:
+    rules_by_user: dict[str, list[RuleDefinition]]
+    source_path: str
+    ruleset_hash: str
+    catalog_version: str
+
+
 class UserRulesRepository:
     def __init__(self) -> None:
         self._cached_path: str | None = None
         self._cached_mtime_ns: int | None = None
-        self._cached_rules_by_user: dict[str, list[RuleDefinition]] | None = None
+        self._cached_loaded: LoadedRules | None = None
 
     def rules_for_user(self, *, user_id: str) -> list[RuleDefinition]:
-        rules_by_user = self._load_rules()
-        return rules_by_user.get(user_id, [])
+        loaded = self._load_rules()
+        return loaded.rules_by_user.get(user_id, [])
 
-    def _load_rules(self) -> dict[str, list[RuleDefinition]]:
+    def load(self) -> LoadedRules:
+        return self._load_rules()
+
+    def _load_rules(self) -> LoadedRules:
         rules_file = os.getenv(_USER_RULES_FILE_ENV)
         if rules_file is None or rules_file.strip() == "":
             raise RuleConfigurationError(
@@ -95,11 +109,11 @@ class UserRulesRepository:
             raise RuleConfigurationError(f"Could not stat rule file '{path}': {exc}") from exc
 
         if (
-            self._cached_rules_by_user is not None
+            self._cached_loaded is not None
             and self._cached_path == str(path)
             and self._cached_mtime_ns == stat.st_mtime_ns
         ):
-            return self._cached_rules_by_user
+            return self._cached_loaded
 
         try:
             raw = path.read_text(encoding="utf-8")
@@ -112,10 +126,17 @@ class UserRulesRepository:
             raise RuleConfigurationError(f"Rule file '{path}' contains invalid YAML: {exc}") from exc
 
         rules_by_user = _parse_rules_catalog(parsed)
+        digest = sha256(raw.encode("utf-8")).hexdigest()
+        loaded = LoadedRules(
+            rules_by_user=rules_by_user,
+            source_path=str(path),
+            ruleset_hash=f"sha256:{digest}",
+            catalog_version=f"pol_{digest[:12]}",
+        )
         self._cached_path = str(path)
         self._cached_mtime_ns = stat.st_mtime_ns
-        self._cached_rules_by_user = rules_by_user
-        return rules_by_user
+        self._cached_loaded = loaded
+        return loaded
 
 
 class RuleEvaluator:
@@ -278,7 +299,14 @@ def evaluate_authorize_action(
         "has_pending_approval": run_facts.has_pending_approval,
     }
 
-    rules = _RULES_REPOSITORY.rules_for_user(user_id=payload.context.user_id)
+    loaded = _RULES_REPOSITORY.load()
+    expected_version = payload.context.policy_catalog_version
+    if expected_version is not None and expected_version.strip() and expected_version != loaded.catalog_version:
+        raise PolicyCatalogVersionMismatchError(
+            expected=expected_version,
+            actual=loaded.catalog_version,
+        )
+    rules = loaded.rules_by_user.get(payload.context.user_id, [])
 
     matched: list[MatchResult] = []
     for rule in rules:
@@ -303,6 +331,61 @@ def evaluate_authorize_action(
         "reason_code": reason_code,
         "matched_rule_ids": [item.rule.id for item in matched],
         "matched_reasons": [item.rule.reason for item in matched],
+        "policy_catalog_version": loaded.catalog_version,
+    }
+
+
+def get_policy_catalog(*, user_id: str | None = None) -> dict[str, Any]:
+    loaded = _RULES_REPOSITORY.load()
+    selected_users: list[tuple[str, list[RuleDefinition]]]
+    if user_id is None:
+        selected_users = sorted(loaded.rules_by_user.items(), key=lambda item: item[0])
+    else:
+        rules = loaded.rules_by_user.get(user_id, [])
+        selected_users = [(user_id, rules)]
+
+    users_payload = []
+    protected_actions: set[str] = set()
+    for uid, rules in selected_users:
+        action_map: dict[str, dict[str, Any]] = {}
+        for rule in rules:
+            fields = sorted(_extract_context_paths(rule.when))
+            for action in rule.applies_to:
+                protected_actions.add(action)
+                entry = action_map.setdefault(
+                    action,
+                    {
+                        "action": action,
+                        "rule_ids": [],
+                        "required_context_fields": set(),
+                    },
+                )
+                entry["rule_ids"].append(rule.id)
+                entry["required_context_fields"].update(fields)
+        users_payload.append(
+            {
+                "user_id": uid,
+                "actions": [
+                    {
+                        "action": action_entry["action"],
+                        "rule_ids": action_entry["rule_ids"],
+                        "required_context_fields": sorted(action_entry["required_context_fields"]),
+                    }
+                    for action_entry in sorted(
+                        action_map.values(),
+                        key=lambda value: str(value["action"]),
+                    )
+                ],
+            }
+        )
+
+    return {
+        "policy_set": _POLICY_SET,
+        "catalog_version": loaded.catalog_version,
+        "ruleset_hash": loaded.ruleset_hash,
+        "source_path": loaded.source_path,
+        "protected_actions": sorted(protected_actions),
+        "users": users_payload,
     }
 
 
@@ -460,6 +543,22 @@ def _compare_values(*, left: Any, op: ast.cmpop, right: Any) -> bool:
     if isinstance(op, ast.NotIn):
         return left not in right
     raise RuleExpressionError(rule_id="unknown", expression="compare", message="Unsupported compare")
+
+
+def _extract_context_paths(expression: str) -> set[str]:
+    try:
+        node = ast.parse(expression, mode="eval")
+    except SyntaxError:
+        return set()
+    paths: set[str] = set()
+    for child in ast.walk(node):
+        if not isinstance(child, ast.Attribute):
+            continue
+        full = _attribute_path(child)
+        if not full.startswith("context."):
+            continue
+        paths.add(full[len("context.") :])
+    return paths
 
 
 _RULES_REPOSITORY = UserRulesRepository()
