@@ -20,10 +20,10 @@ def test_issue75_authorize_action_decision_is_identical_across_http_stdio_and_re
     payload = {
         "intent": {"action": "purchase.create"},
         "context": {
+            "user_id": "user_test",
             "request_id": "req_issue75_parity",
             "amount": 101,
             "currency": "EUR",
-            "transport_decision_hint": "allow",
         },
     }
 

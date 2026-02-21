@@ -18,6 +18,7 @@ from nightledger_api.services.approval_service import (
 from nightledger_api.services.authorize_action_service import (
     AuthorizeActionContext,
     AuthorizeActionRequest,
+    RunFacts,
     evaluate_authorize_action,
 )
 from nightledger_api.services.audit_export_service import export_decision_audit
@@ -315,7 +316,8 @@ def authorize_action(
     payload: AuthorizeActionRequest,
     store: EventStore = Depends(get_event_store),
 ) -> dict[str, Any]:
-    decision = evaluate_authorize_action(payload=payload)
+    run_facts = _build_run_facts(store=store, context=payload.context)
+    decision = evaluate_authorize_action(payload=payload, run_facts=run_facts)
     run_id = _context_run_id(context=payload.context, decision_id=decision["decision_id"])
 
     _append_runtime_receipt(
@@ -753,6 +755,20 @@ def _context_run_id(*, context: AuthorizeActionContext, decision_id: str) -> str
     if isinstance(request_id, str) and request_id.strip():
         return f"run_{request_id.strip()}"
     return f"run_{decision_id}"
+
+
+def _build_run_facts(*, store: EventStore, context: AuthorizeActionContext) -> RunFacts:
+    run_id = _context_extra_value(context=context, key="run_id")
+    if not isinstance(run_id, str) or run_id.strip() == "":
+        return RunFacts(event_count=0, has_pending_approval=False)
+    events = store.list_by_run_id(run_id.strip())
+    if not events:
+        return RunFacts(event_count=0, has_pending_approval=False)
+    status = project_run_status(events)
+    return RunFacts(
+        event_count=len(events),
+        has_pending_approval=status.pending_approval is not None,
+    )
 
 
 def _context_extra_value(*, context: AuthorizeActionContext, key: str) -> Any:

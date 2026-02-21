@@ -27,6 +27,9 @@ from nightledger_api.presenters.error_presenter import (
     present_execution_token_missing_error,
     present_execution_payload_mismatch_error,
     present_execution_token_replayed_error,
+    present_rule_configuration_error,
+    present_rule_expression_error,
+    present_rule_input_error,
 )
 from nightledger_api.services.errors import (
     AmbiguousEventIdError,
@@ -48,6 +51,9 @@ from nightledger_api.services.errors import (
     ExecutionTokenMissingError,
     ExecutionPayloadMismatchError,
     ExecutionTokenReplayedError,
+    RuleConfigurationError,
+    RuleExpressionError,
+    RuleInputError,
 )
 
 
@@ -297,3 +303,37 @@ async def handle_execution_token_misconfigured_error(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=present_execution_token_misconfigured_error(exc),
     )
+
+
+@app.exception_handler(RuleConfigurationError)
+async def handle_rule_configuration_error(
+    request: Request, exc: RuleConfigurationError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=present_rule_configuration_error(exc),
+    )
+
+
+@app.exception_handler(RuleExpressionError)
+async def handle_rule_expression_error(
+    request: Request, exc: RuleExpressionError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=present_rule_expression_error(exc),
+    )
+
+
+@app.exception_handler(RuleInputError)
+async def handle_rule_input_error(
+    request: Request, exc: RuleInputError
+) -> JSONResponse:
+    _ = request
+    return JSONResponse(
+        status_code=HTTP_422_UNPROCESSABLE,
+        content=present_rule_input_error(exc),
+    )
+

@@ -94,7 +94,7 @@ This is the production-facing contract for a real bot integration using
 No simulation is required for this flow. OpenClaw (or any independent bot)
 should implement these contract steps directly.
 
-## MCP authorize_action (Issue #44 v1 contract)
+## MCP authorize_action (v2 user-local rule engine)
 
 Endpoint:
 
@@ -102,63 +102,68 @@ Endpoint:
 POST /v1/mcp/authorize_action
 ```
 
-Policy rule (Issue #45 sub-issue 1):
+Policy rule inputs and source:
 
-- `context.amount` and `context.currency` are required policy inputs.
-- Default threshold: `100` EUR (override with
-  `NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR`).
-- `amount <= threshold` => `allow`
-- `amount > threshold` => `requires_approval`
-- `transport_decision_hint` (`allow|requires_approval|deny`) is accepted for
-  backward compatibility but does not override policy outcome.
+- `context.user_id`, `context.amount`, and `context.currency` are required.
+- `intent.action` is any non-empty string.
+- User rule catalog is loaded from `NIGHTLEDGER_USER_RULES_FILE` (YAML).
+- Rule actions map to decision states:
+  - `allow` => `allow`
+  - `require_approval` => `requires_approval`
+  - `deny` => `deny`
+- If no rule matches, decision defaults to `allow`.
 
 Allow response (`amount` at threshold):
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_allow","amount":100,"currency":"EUR","transport_decision_hint":"deny"}}'
+  -d '{"intent":{"action":"purchase.create"},"context":{"user_id":"user_123","request_id":"req_allow","amount":100,"currency":"EUR"}}'
 ```
 
 ```json
 {
   "decision_id": "dec_...",
   "state": "allow",
-  "reason_code": "POLICY_ALLOW_WITHIN_THRESHOLD",
+  "reason_code": "POLICY_ALLOW_NO_MATCH",
+  "matched_rule_ids": [],
+  "matched_reasons": [],
   "execution_token": "<signed-token>",
   "execution_token_expires_at": "2026-02-18T12:05:00Z"
 }
 ```
 
-Requires approval response (`amount` above threshold):
+Requires approval response (rule match):
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"purchase.create"},"context":{"request_id":"req_pause","amount":101,"currency":"EUR","transport_decision_hint":"allow"}}'
+  -d '{"intent":{"action":"purchase.create"},"context":{"user_id":"user_123","request_id":"req_pause","amount":101,"currency":"EUR","projected_monthly_spend":60000}}'
 ```
 
 ```json
 {
   "decision_id": "dec_...",
   "state": "requires_approval",
-  "reason_code": "AMOUNT_ABOVE_THRESHOLD"
+  "reason_code": "RULE_REQUIRE_APPROVAL",
+  "matched_rule_ids": ["budget_monthly_cap"],
+  "matched_reasons": ["Monthly budget cap exceeded"]
 }
 ```
 
-Invalid payload example (`intent.action` not supported):
+Invalid payload example (`context.user_id` missing):
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
   -H "Content-Type: application/json" \
-  -d '{"intent":{"action":"transfer.create"},"context":{"request_id":"req_invalid","amount":50,"currency":"EUR"}}'
+  -d '{"intent":{"action":"invoice.pay"},"context":{"request_id":"req_invalid","amount":50,"currency":"EUR"}}'
 ```
 
 ```json
 {
   "error": {
     "code": "REQUEST_VALIDATION_ERROR",
-    "details": [{ "path": "intent.action", "code": "UNSUPPORTED_ACTION" }]
+    "details": [{ "path": "context.user_id", "code": "MISSING_USER_ID" }]
   }
 }
 ```

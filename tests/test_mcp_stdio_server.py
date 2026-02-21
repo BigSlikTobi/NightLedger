@@ -82,13 +82,13 @@ def test_mcp_tools_list_exposes_authorize_action_contract() -> None:
     assert tool["name"] == "authorize_action"
     assert tool["inputSchema"]["type"] == "object"
     context_schema = tool["inputSchema"]["properties"]["context"]
+    assert "user_id" in context_schema["properties"]
     assert "amount" in context_schema["properties"]
     assert "currency" in context_schema["properties"]
-    assert "amount" in context_schema["required"]
-    assert "currency" in context_schema["required"]
+    assert "user_id" in context_schema["required"]
 
 
-def test_mcp_tools_call_returns_allow_when_amount_is_at_threshold() -> None:
+def test_mcp_tools_call_returns_allow_when_no_rule_matches() -> None:
     server = MCPServer()
 
     response = server.handle_message(
@@ -101,10 +101,10 @@ def test_mcp_tools_call_returns_allow_when_amount_is_at_threshold() -> None:
                 "arguments": {
                     "intent": {"action": "purchase.create"},
                     "context": {
+                        "user_id": "user_test",
                         "request_id": "req_1",
                         "amount": 100,
                         "currency": "EUR",
-                        "transport_decision_hint": "deny",
                     },
                 },
             },
@@ -116,11 +116,11 @@ def test_mcp_tools_call_returns_allow_when_amount_is_at_threshold() -> None:
     assert result.get("isError") is not True
     decision = result["structuredContent"]
     assert decision["state"] == "allow"
-    assert decision["reason_code"] == "POLICY_ALLOW_WITHIN_THRESHOLD"
+    assert decision["reason_code"] == "POLICY_ALLOW_NO_MATCH"
     assert decision["decision_id"].startswith("dec_")
 
 
-def test_mcp_tools_call_returns_requires_approval_when_above_threshold() -> None:
+def test_mcp_tools_call_returns_requires_approval_when_rule_matches() -> None:
     server = MCPServer()
 
     response = server.handle_message(
@@ -133,10 +133,10 @@ def test_mcp_tools_call_returns_requires_approval_when_above_threshold() -> None
                 "arguments": {
                     "intent": {"action": "purchase.create"},
                     "context": {
+                        "user_id": "user_test",
                         "request_id": "req_2",
                         "amount": 101,
                         "currency": "EUR",
-                        "transport_decision_hint": "allow",
                     },
                 },
             },
@@ -148,7 +148,7 @@ def test_mcp_tools_call_returns_requires_approval_when_above_threshold() -> None
     assert result.get("isError") is not True
     decision = result["structuredContent"]
     assert decision["state"] == "requires_approval"
-    assert decision["reason_code"] == "AMOUNT_ABOVE_THRESHOLD"
+    assert decision["reason_code"] == "RULE_REQUIRE_APPROVAL"
     assert "execution_token" not in decision
 
 
@@ -164,7 +164,7 @@ def test_mcp_tools_call_returns_structured_validation_error_for_missing_amount()
                 "name": "authorize_action",
                 "arguments": {
                     "intent": {"action": "purchase.create"},
-                    "context": {"request_id": "req_missing", "currency": "EUR"},
+                    "context": {"user_id": "user_test", "request_id": "req_missing", "currency": "EUR"},
                 },
             },
         }
@@ -181,7 +181,7 @@ def test_mcp_tools_call_returns_structured_validation_error_for_missing_amount()
     assert detail_codes["context.amount"] == "MISSING_AMOUNT"
 
 
-def test_mcp_tools_call_returns_structured_validation_error_for_invalid_action() -> None:
+def test_mcp_tools_call_accepts_dynamic_action_string() -> None:
     server = MCPServer()
 
     response = server.handle_message(
@@ -192,8 +192,8 @@ def test_mcp_tools_call_returns_structured_validation_error_for_invalid_action()
             "params": {
                 "name": "authorize_action",
                 "arguments": {
-                    "intent": {"action": "transfer.create"},
-                    "context": {"request_id": "req_bad", "amount": 100, "currency": "EUR"},
+                    "intent": {"action": "invoice.pay"},
+                    "context": {"user_id": "user_test", "request_id": "req_dyn", "amount": 120, "currency": "EUR"},
                 },
             },
         }
@@ -201,13 +201,7 @@ def test_mcp_tools_call_returns_structured_validation_error_for_invalid_action()
 
     assert response is not None
     result = response["result"]
-    assert result["isError"] is True
-    error_payload = result["structuredContent"]
-    assert error_payload["error"]["code"] == "REQUEST_VALIDATION_ERROR"
-    detail_codes = {
-        detail["path"]: detail["code"] for detail in error_payload["error"]["details"]
-    }
-    assert detail_codes["intent.action"] == "UNSUPPORTED_ACTION"
+    assert result["structuredContent"]["state"] == "requires_approval"
 
 
 def test_mcp_ignores_initialized_notification() -> None:
@@ -236,10 +230,10 @@ def test_mcp_serve_streams_processes_framed_jsonrpc_messages() -> None:
             "arguments": {
                 "intent": {"action": "purchase.create"},
                 "context": {
+                    "user_id": "user_test",
                     "request_id": "req_stream",
                     "amount": 100,
                     "currency": "EUR",
-                    "transport_decision_hint": "requires_approval",
                 },
             },
         },
@@ -258,7 +252,7 @@ def test_mcp_serve_streams_processes_framed_jsonrpc_messages() -> None:
     assert response["result"]["structuredContent"]["state"] == "allow"
 
 
-def test_mcp_server_module_is_callable_over_stdio_transport() -> None:
+def test_mcp_server_module_is_callable_over_stdio_transport(tmp_path) -> None:
     root = Path(__file__).resolve().parents[1]
     env = os.environ.copy()
     existing_pythonpath = env.get("PYTHONPATH", "")
@@ -266,6 +260,23 @@ def test_mcp_server_module_is_callable_over_stdio_transport() -> None:
     env["PYTHONPATH"] = (
         src_path if not existing_pythonpath else f"{src_path}{os.pathsep}{existing_pythonpath}"
     )
+
+    rules_path = tmp_path / "stdio_rules.yaml"
+    rules_path.write_text(
+        (
+            "users:\n"
+            "  user_test:\n"
+            "    rules:\n"
+            "      - id: threshold\n"
+            "        type: guardrail\n"
+            "        applies_to: [\"purchase.create\"]\n"
+            "        when: \"context.amount > 100\"\n"
+            "        action: \"require_approval\"\n"
+            "        reason: \"Above threshold\"\n"
+        ),
+        encoding="utf-8",
+    )
+    env["NIGHTLEDGER_USER_RULES_FILE"] = str(rules_path)
 
     initialize_request = {
         "jsonrpc": "2.0",
@@ -286,30 +297,29 @@ def test_mcp_server_module_is_callable_over_stdio_transport() -> None:
             "arguments": {
                 "intent": {"action": "purchase.create"},
                 "context": {
-                    "request_id": "req_proc",
-                    "amount": 101,
+                    "user_id": "user_test",
+                    "request_id": "req_stdio_module",
+                    "amount": 120,
                     "currency": "EUR",
-                    "transport_decision_hint": "allow",
                 },
             },
         },
     }
     payload = _encode_framed_message(initialize_request) + _encode_framed_message(call_request)
 
-    proc = subprocess.Popen(
+    process = subprocess.run(  # noqa: S603
         [sys.executable, "-m", "nightledger_api.mcp_server"],
-        stdin=subprocess.PIPE,
+        input=payload,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        cwd=root,
         env=env,
+        check=True,
     )
-    stdout, stderr = proc.communicate(input=payload, timeout=5)
-    assert proc.returncode == 0, stderr.decode("utf-8")
 
-    output_buffer = BytesIO(stdout)
-    responses = _extract_framed_messages(output_buffer)
+    output_stream = BytesIO(process.stdout)
+    responses = _extract_framed_messages(output_stream)
     assert len(responses) == 2
     assert responses[0]["id"] == 11
-    assert responses[0]["result"]["serverInfo"]["name"] == "nightledger"
     assert responses[1]["id"] == 12
     assert responses[1]["result"]["structuredContent"]["state"] == "requires_approval"

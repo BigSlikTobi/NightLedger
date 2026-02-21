@@ -22,6 +22,9 @@ from nightledger_api.services.errors import (
     ExecutionTokenMissingError,
     ExecutionTokenReplayedError,
     ExecutionPayloadMismatchError,
+    RuleConfigurationError,
+    RuleExpressionError,
+    RuleInputError,
 )
 
 
@@ -442,6 +445,59 @@ def present_execution_token_misconfigured_error(
     }
 
 
+def present_rule_configuration_error(exc: RuleConfigurationError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "RULE_CONFIGURATION_ERROR",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "configuration",
+                    "message": str(exc),
+                    "type": "configuration_error",
+                    "code": "RULE_CONFIGURATION_ERROR",
+                }
+            ],
+        }
+    }
+
+
+def present_rule_expression_error(exc: RuleExpressionError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "RULE_EXPRESSION_INVALID",
+            "message": str(exc),
+            "details": [
+                {
+                    "path": "rule.when",
+                    "message": str(exc),
+                    "type": "configuration_error",
+                    "code": "RULE_EXPRESSION_INVALID",
+                    "rule_id": exc.rule_id,
+                    "expression": exc.expression,
+                }
+            ],
+        }
+    }
+
+
+def present_rule_input_error(exc: RuleInputError) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "REQUEST_VALIDATION_ERROR",
+            "message": "authorize_action payload failed validation",
+            "details": [
+                {
+                    "path": exc.path,
+                    "message": str(exc),
+                    "type": "missing",
+                    "code": "MISSING_RULE_INPUT",
+                }
+            ],
+        }
+    }
+
+
 def _map_approval_validation_code(*, path: str, error_type: str) -> str:
     if path == "decision":
         if error_type == "missing":
@@ -477,7 +533,11 @@ def _map_authorize_action_validation_code(*, path: str, error_type: str) -> str:
     if path == "intent.action":
         if error_type == "missing":
             return "MISSING_ACTION"
-        return "UNSUPPORTED_ACTION"
+        return "INVALID_ACTION"
+    if path == "context.user_id":
+        if error_type in {"missing", "string_too_short"}:
+            return "MISSING_USER_ID"
+        return "INVALID_USER_ID"
     if path == "context.amount":
         if error_type == "missing":
             return "MISSING_AMOUNT"

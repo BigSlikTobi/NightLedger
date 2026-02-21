@@ -1,0 +1,108 @@
+policy_set: nightledger-v1
+currency: USD
+
+# Runtime-compatible policy set for current NightLedger v2 rule engine.
+# Notes:
+# - Rule engine currently requires users.<user_id>.rules[].
+# - Supported actions: allow | require_approval | deny.
+# - Arithmetic in `when` is not supported yet; precompute thresholds in context.
+
+users:
+  user_123:
+    rules:
+      - id: budget_monthly_cap
+        type: guardrail
+        applies_to: ["purchase.create", "invoice.pay", "offer.select"]
+        when: "context.projected_monthly_spend > 50000"
+        action: "require_approval"
+        reason: "Monthly budget cap exceeded"
+
+      - id: request_cost_cap
+        type: guardrail
+        applies_to: ["purchase.create", "invoice.pay", "offer.select"]
+        when: "context.estimated_total_cost > 3000"
+        action: "require_approval"
+        reason: "Per-request cost above cap"
+
+      - id: min_reliability_floor
+        type: hard_constraint
+        applies_to: ["offer.select", "purchase.create", "invoice.pay"]
+        when: "context.offer.reliability < 0.90"
+        action: "deny"
+        reason: "Reliability below SLA floor"
+
+      - id: urgency_bias
+        type: scoring_override
+        applies_to: ["offer.select", "purchase.create", "invoice.pay"]
+        when: "context.request.priority in ['high', 'urgent', 'critical']"
+        action: "require_approval"
+        reason: "Urgent requests prioritize SLA/perf"
+
+      - id: provider_concentration_limit
+        type: portfolio_constraint
+        applies_to: ["offer.select", "purchase.create", "invoice.pay"]
+        when: "context.provider_share_rolling_30d > 0.60"
+        action: "require_approval"
+        reason: "Provider concentration risk too high"
+
+      - id: approved_regions_only
+        type: hard_constraint
+        applies_to: ["offer.select", "purchase.create", "invoice.pay"]
+        when: "context.offer.region not in ['EU', 'us-east-1', 'us-west-2']"
+        action: "deny"
+        reason: "Region not approved"
+
+      - id: fallback_required
+        type: hard_constraint
+        applies_to: ["offer.select", "purchase.create", "invoice.pay"]
+        when: "context.fallback_candidates_count < 1"
+        action: "require_approval"
+        reason: "No fallback option available"
+
+      - id: price_anomaly_up
+        type: anomaly
+        applies_to: ["offer.select", "purchase.create", "invoice.pay"]
+        when: "context.offer.estimated_total_cost > context.price_anomaly_upper_bound"
+        action: "require_approval"
+        reason: "Cost anomaly above expected range"
+
+      - id: strategy_underperforms_aws
+        type: benchmark_fail_safe
+        applies_to: ["offer.select", "purchase.create", "invoice.pay"]
+        when: "context.objective_score_rolling_100 < context.aws_underperform_threshold"
+        action: "require_approval"
+        reason: "Strategy underperforming AWS baseline"
+
+      - id: new_provider_gate
+        type: approval_gate
+        applies_to: ["offer.select", "purchase.create", "invoice.pay"]
+        when: "context.offer.provider not in context.approved_providers"
+        action: "require_approval"
+        reason: "First-time provider usage"
+
+      - id: provider_streak_limit_last_5
+        type: portfolio_constraint
+        applies_to: ["offer.select", "purchase.create", "invoice.pay"]
+        when: "context.same_provider_streak_last_5 >= 5"
+        action: "require_approval"
+        reason: "Last 5 decisions used the same provider; switch provider and request approval"
+
+global_goal:
+  objective: "maximize_company_outcome"
+  weights:
+    cost: 0.45
+    performance: 0.25
+    reliability_sla: 0.30
+
+approvals:
+  conservative_mode:
+    defaults:
+      allowed_providers: ["aws", "gcp", "azure", "lambda", "runpod"]
+      min_reliability: 0.93
+      max_request_cost: 2000
+
+audit:
+  log_decision_text: true
+  log_validation: true
+  log_benchmark_comparison: true
+  append_only: true

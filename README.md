@@ -126,9 +126,10 @@ node --test model/*.test.js controller/*.test.js view/*.test.js
 
 ### Local Runtime
 
-1. Start API (Terminal A):
+1. Start API with user-local rules enabled (Terminal A):
 
 ```bash
+NIGHTLEDGER_USER_RULES_FILE=/Users/tobiaslatta/Projects/github/bigsliktobi/NightLedger/user_rules.runtime.yaml \
 PYTHONPATH=src ./.venv/bin/python -m uvicorn nightledger_api.main:app --reload --port 8001
 ```
 
@@ -143,6 +144,20 @@ Open:
 ```text
 http://localhost:3000/view/?mode=live&runId=run_triage_inbox_demo_1&apiBase=http://127.0.0.1:8001
 ```
+
+3. Validate `authorize_action` with user-local policy (Terminal C):
+
+```bash
+curl -sS -X POST http://127.0.0.1:8001/v1/mcp/authorize_action \
+  -H "Content-Type: application/json" \
+  -d '{"intent":{"action":"purchase.create"},"context":{"user_id":"user_123","request_id":"req_readme_demo","amount":101,"currency":"EUR","merchant":"ACME GmbH"}}'
+```
+
+Expected behavior in v2:
+
+- `context.user_id` is required.
+- Decision comes from user-local YAML rules (`NIGHTLEDGER_USER_RULES_FILE`).
+- Response includes `matched_rule_ids` and `matched_reasons`.
 
 ### Deterministic purchase enforcement demo (Issue #49)
 
