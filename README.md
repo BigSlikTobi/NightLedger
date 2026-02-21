@@ -1,88 +1,50 @@
 # <img src="docs/images/nightledger_logo.png" width="80" alt="NightLedger 3D Logo" /> NightLedger: Autonomy with Receipts.
 
-## 5 Day Hackathon Mode On!
+NightLedger is a lightweight runtime accountability layer for AI agents.
+It captures append-only receipts, enforces risk gates, and makes approvals
+explicit before high-risk actions execute.
 
-This codebase is the result of my 5-day hackathon executed with my OpenClaw
-agent, `Deborahbot`.
+## Built together
+
+This repo was built together by **Tobi** and his OpenClaw agent **Deborahbot**.
 
 <img src="docs/images/Deborahbot.png" width="80" alt="Deborahbot" />
 
-### Technical Problem We Wanted to Solve
+## Vision, Mission, and MVP (at a glance)
 
-Current agent tooling is strong at execution but weak at accountability:
+- **Vision:** *The world runs on autonomous systems — safe, transparent, and accountable by default.*
+- **Mission:** *Build the accountability infrastructure for the autonomous era.*
+- **MVP:** prove one deterministic control loop from event capture to approval-gated resume.
 
-1. Autonomous actions can happen without immutable receipts.
-2. High-risk steps are often gated by ad-hoc prompts instead of enforceable
-   runtime policy.
-3. Human approval is frequently disconnected from the exact decision context.
-4. Integrations often lack deterministic contracts for pause/resume behavior.
+## 60-second proof
 
-This hackathon focused on solving that systems gap by building a runtime layer
-that is append-only, policy-gated, approval-aware, and contract-driven.
+**What happened**
+- A run emits structured runtime events via `POST /v1/events`; operators view
+  them as a human-readable timeline via `GET /v1/runs/{run_id}/journal`.
 
-The assumption tested was simple:
+**What got blocked**
+- A risky action transitions to `requires_approval`; execution pauses fail-closed
+  until a human decision is recorded.
 
-> If autonomous systems must show their work before real-world impact, autonomy
-> can be deployed with trust instead of blind faith.
+**Why this is trustworthy**
+- Decisions and transitions are append-only, replayable, and exportable as
+  tamper-evident receipts.
 
-The goal was to prove or disprove that assumption through running software,
-contract tests, and deterministic demos.
+## Why NightLedger (vs plain logs / generic tracing)
 
-Key hypothesis checks:
-
-1. Every meaningful step is captured as append-only evidence.
-2. Risky side effects are paused for explicit human approval.
-3. Bot integrations can rely on deterministic API/MCP contracts.
-4. The execution trail is auditable by people outside the authoring loop.
-
-Result at MVP scope: this hypothesis is supported by the implemented flows.
-
-## How This Was Built (agents.md)
-
-I followed the repo constitution in [`agents.md`](agents.md):
-
-1. Docs-first for behavior changes.
-2. TDD-first (failing tests before implementation).
-3. Strict separation of concerns (Capture / Governance / Representation).
-4. No silent failures.
-5. Atomic issue breakdown and commits.
-6. 5-round TDD + audit discipline.
-7. Diary updates for every completed issue.
-
-## Issues and Context
-
-I executed the hackathon as issue-sliced delivery tracked in GitHub.
-
-For complete history and current status:
-
-- [All issues](https://github.com/BigSlikTobi/NightLedger/issues)
-- [Open issues](https://github.com/BigSlikTobi/NightLedger/issues?q=is%3Aissue+is%3Aopen)
-- [Closed issues](https://github.com/BigSlikTobi/NightLedger/issues?q=is%3Aissue+is%3Aclosed)
-
-## High-Level Outcome
-
-What We implemented:
-
-1. Append-only runtime accountability.
-2. Governance gates for risky actions.
-3. Human approval lifecycle.
-4. Token-gated protected execution.
-5. Tamper-evident audit export.
-6. Deterministic proof demo paths.
-7. Local and remote MCP integration support.
+| Concern | Plain logs / generic tracing | NightLedger |
+| --- | --- | --- |
+| Risk decisions | Usually descriptive only | Enforced runtime gate (`allow / requires_approval / deny`) |
+| Human-in-the-loop | Often out-of-band | First-class approval lifecycle + explicit resume path |
+| Auditability | Hard to prove order/integrity | Append-only event stream + audit export |
+| Operator UX | Raw technical records | Journal/timeline projection for non-authors |
+| Bot integration | Ad-hoc behavior | Deterministic API + MCP contract boundaries |
 
 ## Deconstructing Vision and MVP for Readers
 
 ### Vision
 
-NightLedger is an accountability layer for the agentic era: autonomy with
-receipts.
-
-Related source documents:
-
-- [`spec/MVP/discovery.md`](spec/MVP/discovery.md)
-- [`spec/MVP/MVP.md`](spec/MVP/MVP.md)
-- [`spec/MVP/product_design.md`](spec/MVP/product_design.md)
+NightLedger is an accountability layer for the agentic era: autonomy with receipts.
 
 ### MVP
 
@@ -95,18 +57,16 @@ The MVP proves one full control loop:
 5. Approve/reject
 6. Resume/stop with receipts
 
-Post-MVP items remain tracked separately (for example `#84/#85/#86`).
+## Proof metrics (current)
 
-Related implementation contracts:
+- **Policy boundary is deterministic:** amount `<= 100 EUR` => `allow`, amount
+  `> 100 EUR` => `requires_approval` (documented and contract-tested).
+- **Approval loop is explicit:** unresolved decisions fail execution-token mint
+  with `409 EXECUTION_DECISION_NOT_APPROVED`; mint succeeds only after approval.
+- **One-command reproducibility:** deterministic `block -> approve -> execute`
+  smoke flow available via `tasks/smoke_purchase_enforcement_demo.sh` (**Issue #49**).
 
-- [`spec/API.md`](spec/API.md)
-- [`spec/EVENT_SCHEMA.md`](spec/EVENT_SCHEMA.md)
-- [`spec/BUSINESS_RULES.md`](spec/BUSINESS_RULES.md)
-- [`docs/TECHNICAL_GUIDE.md`](docs/TECHNICAL_GUIDE.md)
-
-## Step-by-Step: Test and Run
-
-### Quick Start (Fresh Clone)
+## Quick start
 
 ```bash
 git clone https://github.com/bigsliktobi/NightLedger.git
@@ -116,7 +76,7 @@ python -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 ```
 
-### Local Verification (Matches CI)
+## Local Verification (Matches CI)
 
 ```bash
 ./.venv/bin/pytest -q
@@ -124,7 +84,7 @@ cd apps/web
 node --test model/*.test.js controller/*.test.js view/*.test.js
 ```
 
-### Local Runtime
+## Local runtime
 
 1. Start API with user-local rules enabled (Terminal A):
 
@@ -169,30 +129,39 @@ bash tasks/smoke_purchase_enforcement_demo.sh
 
 ## Canonical Sources of Truth
 
-| Concern                               | Canonical source                                   |
-| ------------------------------------- | -------------------------------------------------- |
-| Runtime behavior and layer boundaries | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)     |
-| HTTP API contract and error envelopes | [`spec/API.md`](spec/API.md)                       |
-| Event payload schema contract         | [`spec/EVENT_SCHEMA.md`](spec/EVENT_SCHEMA.md)     |
+| Concern | Canonical source |
+| --- | --- |
+| Runtime behavior and layer boundaries | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| HTTP API contract and error envelopes | [`spec/API.md`](spec/API.md) |
+| Event payload schema contract | [`spec/EVENT_SCHEMA.md`](spec/EVENT_SCHEMA.md) |
 | Governance/risk/approval rule catalog | [`spec/BUSINESS_RULES.md`](spec/BUSINESS_RULES.md) |
 
-## Documentation Map
+## Documentation map
 
-| Doc                                                        | Purpose                               |
-| ---------------------------------------------------------- | ------------------------------------- |
-| [`README.md`](README.md)                                   | Vision, MVP, and hackathon context    |
-| [`docs/TECHNICAL_GUIDE.md`](docs/TECHNICAL_GUIDE.md)       | Full conceptual + technical deep dive |
-| [`spec/MVP/discovery.md`](spec/MVP/discovery.md)           | Strategy and problem framing          |
-| [`spec/MVP/MVP.md`](spec/MVP/MVP.md)                       | MVP scope and success criteria        |
-| [`spec/MVP/product_design.md`](spec/MVP/product_design.md) | Layered design principles             |
-| [`spec/MVP/roadmap.md`](spec/MVP/roadmap.md)               | Current execution roadmap             |
-| [`docs/API_TESTING.md`](docs/API_TESTING.md)               | Local API smoke flows                 |
-| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)               | Reproducible demo handoff path        |
+| Doc | Purpose |
+| --- | --- |
+| [`README.md`](README.md) | Product overview + runnable proof path |
+| [`docs/TECHNICAL_GUIDE.md`](docs/TECHNICAL_GUIDE.md) | Full conceptual + technical deep dive |
+| [`spec/MVP/discovery.md`](spec/MVP/discovery.md) | Strategy and problem framing |
+| [`spec/MVP/MVP.md`](spec/MVP/MVP.md) | MVP scope and success criteria |
+| [`spec/MVP/product_design.md`](spec/MVP/product_design.md) | Layered design principles |
+| [`spec/MVP/roadmap.md`](spec/MVP/roadmap.md) | Current execution roadmap |
+| [`docs/API_TESTING.md`](docs/API_TESTING.md) | Local API smoke flows |
+| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | Reproducible demo handoff path |
 | [`docs/SHOWCASE_E2E_SETUP.md`](docs/SHOWCASE_E2E_SETUP.md) | End-to-end showcase operator playbook |
-| [`docs/REPO_HYGIENE.md`](docs/REPO_HYGIENE.md)             | Branch/artifact hygiene policy        |
+| [`docs/REPO_HYGIENE.md`](docs/REPO_HYGIENE.md) | Branch/artifact hygiene policy |
 
-## Technical Deep Dive
+## Hackathon Narrative (Last 5 Days)
 
-For the conceptual + technical implementation details, use:
+This project originated in a 5-day hackathon built with OpenClaw + `Deborahbot`.
+The build process and issue-sliced execution history are preserved in:
+
+- [`agents.md`](agents.md)
+- [`docs/diary.md`](docs/diary.md)
+- [All issues](https://github.com/BigSlikTobi/NightLedger/issues)
+
+## Technical deep dive
+
+For implementation details, see:
 
 - [`docs/TECHNICAL_GUIDE.md`](docs/TECHNICAL_GUIDE.md)
