@@ -21,6 +21,7 @@ def test_issue76_authorize_action_http_response_includes_contract_version() -> N
         json={
             "intent": {"action": "purchase.create"},
             "context": {
+                "user_id": "user_test",
                 "request_id": "req_issue76_contract",
                 "amount": 100,
                 "currency": "EUR",
@@ -38,4 +39,4 @@ def test_issue76_mcp_tool_definition_includes_contract_version_metadata() -> Non
     metadata = tool["x-nightledger-contract"]
     assert metadata["name"] == "authorize_action"
     assert metadata["version"] == AUTHORIZE_ACTION_CONTRACT_VERSION
-    assert metadata["compatibility"] == "backward-compatible"
+    assert metadata["compatibility"] == "breaking-change"

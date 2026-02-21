@@ -145,6 +145,55 @@ behavior. This rule catalog uses the same field names as
   - THEN `evidence` must contain at least one item
   - otherwise reject with `MISSING_RISK_EVIDENCE`
 
+## User-Local Authorization Rules
+
+### RULE-AUTH-001: User Rule Catalog Source
+
+- Needs: runtime config `NIGHTLEDGER_USER_RULES_FILE`
+- Rule:
+  - IF rule file env var is missing, unreadable, or invalid YAML/schema
+  - THEN fail loud with `RULE_CONFIGURATION_ERROR`
+
+### RULE-AUTH-002: User Identity Requirement
+
+- Needs: `context.user_id` on `authorize_action`
+- Rule:
+  - IF missing or empty
+  - THEN reject with `MISSING_USER_ID`
+
+### RULE-AUTH-003: Action Scope
+
+- Needs: `intent.action`, `rules[*].applies_to`
+- Rule:
+  - Evaluate only rules for `context.user_id`
+  - Evaluate only rules where `intent.action` exists in `applies_to`
+
+### RULE-AUTH-004: Expression Language Safety
+
+- Needs: `rules[*].when`
+- Rule:
+  - Expressions are evaluated with safe DSL only (no Python eval)
+  - Supported operands: `context.<field>`, `run.event_count`,
+    `run.has_pending_approval`
+  - Supported operators: `== != > >= < <= in not in and or`
+  - Unsupported syntax fails loud with `RULE_EXPRESSION_INVALID`
+
+### RULE-AUTH-005: Missing Rule Input
+
+- Needs: expression evaluation context
+- Rule:
+  - IF `when` references missing `context.<field>`
+  - THEN reject with `MISSING_RULE_INPUT`
+
+### RULE-AUTH-006: Decision Resolution Priority
+
+- Needs: matched rule actions
+- Rule:
+  - Highest severity wins: `deny > require_approval > allow`
+  - Mapping: `allow -> allow`, `require_approval -> requires_approval`,
+    `deny -> deny`
+  - IF no rule matches, default decision state is `allow`
+
 ## Approval Gate
 
 ### RULE-GATE-001: Pending Approval Pauses Run

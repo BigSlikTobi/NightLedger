@@ -106,12 +106,12 @@ def authorize_action_tool_definition() -> dict[str, Any]:
         "name": "authorize_action",
         "description": (
             "Authorize an action intent before execution. "
-            "Supports purchase.create in v1."
+            "Supports user-scoped dynamic rules for arbitrary actions."
         ),
         "x-nightledger-contract": {
             "name": "authorize_action",
             "version": AUTHORIZE_ACTION_CONTRACT_VERSION,
-            "compatibility": "backward-compatible",
+            "compatibility": "breaking-change",
         },
         "inputSchema": {
             "type": "object",
@@ -123,14 +123,15 @@ def authorize_action_tool_definition() -> dict[str, Any]:
                     "additionalProperties": False,
                     "required": ["action"],
                     "properties": {
-                        "action": {"type": "string", "enum": ["purchase.create"]}
+                        "action": {"type": "string", "minLength": 1}
                     },
                 },
                 "context": {
                     "type": "object",
                     "additionalProperties": True,
-                    "required": ["amount", "currency"],
+                    "required": ["user_id", "amount", "currency"],
                     "properties": {
+                        "user_id": {"type": "string", "minLength": 1},
                         "amount": {"type": "number"},
                         "currency": {"type": "string", "enum": ["EUR"]},
                         "transport_decision_hint": {

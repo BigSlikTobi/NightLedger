@@ -1,26 +1,37 @@
+import ast
 import json
 import os
+from dataclasses import dataclass
 from hashlib import sha256
+from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+import yaml
+from pydantic import BaseModel, ConfigDict, Field
+
+from nightledger_api.services.errors import (
+    RuleConfigurationError,
+    RuleExpressionError,
+    RuleInputError,
+)
 
 
 AuthorizeActionState = Literal["allow", "requires_approval", "deny"]
-_DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR = 100.0
-_PURCHASE_APPROVAL_THRESHOLD_ENV = "NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR"
-AUTHORIZE_ACTION_CONTRACT_VERSION = "1.0.0"
+RuleAction = Literal["allow", "require_approval", "deny"]
+_USER_RULES_FILE_ENV = "NIGHTLEDGER_USER_RULES_FILE"
+AUTHORIZE_ACTION_CONTRACT_VERSION = "2.0.0"
 
 
 class AuthorizeActionIntent(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    action: Literal["purchase.create"]
+    action: str = Field(min_length=1)
 
 
 class AuthorizeActionContext(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="allow")
 
+    user_id: str = Field(min_length=1)
     amount: float
     currency: Literal["EUR"]
     transport_decision_hint: AuthorizeActionState | None = None
@@ -33,18 +44,265 @@ class AuthorizeActionRequest(BaseModel):
     context: AuthorizeActionContext
 
 
-def evaluate_authorize_action(payload: AuthorizeActionRequest) -> dict[str, str]:
-    threshold = _configured_threshold_eur()
-    state: AuthorizeActionState = (
-        "requires_approval"
-        if payload.context.amount > threshold
-        else "allow"
+@dataclass(frozen=True)
+class RunFacts:
+    event_count: int
+    has_pending_approval: bool
+
+
+@dataclass(frozen=True)
+class RuleDefinition:
+    id: str
+    type: str
+    applies_to: tuple[str, ...]
+    when: str
+    action: RuleAction
+    reason: str
+
+
+@dataclass(frozen=True)
+class MatchResult:
+    rule: RuleDefinition
+    outcome: bool
+
+
+class UserRulesRepository:
+    def __init__(self) -> None:
+        self._cached_path: str | None = None
+        self._cached_mtime_ns: int | None = None
+        self._cached_rules_by_user: dict[str, list[RuleDefinition]] | None = None
+
+    def rules_for_user(self, *, user_id: str) -> list[RuleDefinition]:
+        rules_by_user = self._load_rules()
+        return rules_by_user.get(user_id, [])
+
+    def _load_rules(self) -> dict[str, list[RuleDefinition]]:
+        rules_file = os.getenv(_USER_RULES_FILE_ENV)
+        if rules_file is None or rules_file.strip() == "":
+            raise RuleConfigurationError(
+                f"{_USER_RULES_FILE_ENV} is required for authorize_action policy evaluation"
+            )
+
+        path = Path(rules_file).expanduser()
+        if not path.exists() or not path.is_file():
+            raise RuleConfigurationError(
+                f"Rule file '{path}' does not exist or is not a file"
+            )
+
+        try:
+            stat = path.stat()
+        except OSError as exc:
+            raise RuleConfigurationError(f"Could not stat rule file '{path}': {exc}") from exc
+
+        if (
+            self._cached_rules_by_user is not None
+            and self._cached_path == str(path)
+            and self._cached_mtime_ns == stat.st_mtime_ns
+        ):
+            return self._cached_rules_by_user
+
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise RuleConfigurationError(f"Could not read rule file '{path}': {exc}") from exc
+
+        try:
+            parsed = yaml.safe_load(raw)
+        except yaml.YAMLError as exc:
+            raise RuleConfigurationError(f"Rule file '{path}' contains invalid YAML: {exc}") from exc
+
+        rules_by_user = _parse_rules_catalog(parsed)
+        self._cached_path = str(path)
+        self._cached_mtime_ns = stat.st_mtime_ns
+        self._cached_rules_by_user = rules_by_user
+        return rules_by_user
+
+
+class RuleEvaluator:
+    _ALLOWED_COMPARE_OPS = (
+        ast.Eq,
+        ast.NotEq,
+        ast.Gt,
+        ast.GtE,
+        ast.Lt,
+        ast.LtE,
+        ast.In,
+        ast.NotIn,
     )
+
+    def evaluate(
+        self,
+        *,
+        rule: RuleDefinition,
+        context: dict[str, Any],
+        run: dict[str, Any],
+    ) -> bool:
+        try:
+            node = ast.parse(rule.when, mode="eval")
+        except SyntaxError as exc:
+            raise RuleExpressionError(
+                rule_id=rule.id,
+                expression=rule.when,
+                message=f"Invalid rule expression syntax: {exc.msg}",
+            ) from exc
+
+        self._validate_node(node, rule=rule)
+
+        try:
+            value = self._eval(node.body, context=context, run=run)
+        except RuleInputError:
+            raise
+        except Exception as exc:
+            raise RuleExpressionError(
+                rule_id=rule.id,
+                expression=rule.when,
+                message=f"Rule expression evaluation failed: {exc}",
+            ) from exc
+
+        if not isinstance(value, bool):
+            raise RuleExpressionError(
+                rule_id=rule.id,
+                expression=rule.when,
+                message="Rule expression must evaluate to a boolean",
+            )
+        return value
+
+    def _validate_node(self, node: ast.AST, *, rule: RuleDefinition) -> None:
+        allowed_nodes = (
+            ast.Expression,
+            ast.BoolOp,
+            ast.And,
+            ast.Or,
+            ast.UnaryOp,
+            ast.Not,
+            ast.Compare,
+            ast.Name,
+            ast.Load,
+            ast.Attribute,
+            ast.Constant,
+            ast.List,
+            ast.Tuple,
+        )
+        for child in ast.walk(node):
+            if isinstance(child, ast.Compare):
+                for op in child.ops:
+                    if not isinstance(op, self._ALLOWED_COMPARE_OPS):
+                        raise RuleExpressionError(
+                            rule_id=rule.id,
+                            expression=ast.unparse(node) if hasattr(ast, "unparse") else "<expression>",
+                            message="Rule expression uses unsupported comparison operator",
+                        )
+            elif isinstance(child, ast.cmpop):
+                continue
+            elif not isinstance(child, allowed_nodes):
+                raise RuleExpressionError(
+                    rule_id=rule.id,
+                    expression=ast.unparse(node) if hasattr(ast, "unparse") else "<expression>",
+                    message=f"Rule expression uses unsupported syntax: {child.__class__.__name__}",
+                )
+
+    def _eval(self, node: ast.AST, *, context: dict[str, Any], run: dict[str, Any]) -> Any:
+        if isinstance(node, ast.Constant):
+            return node.value
+
+        if isinstance(node, ast.Name):
+            if node.id == "context":
+                return context
+            if node.id == "run":
+                return run
+            if node.id == "True":
+                return True
+            if node.id == "False":
+                return False
+            if node.id == "None":
+                return None
+            raise RuleExpressionError(
+                rule_id="unknown",
+                expression=node.id,
+                message=f"Unknown rule symbol '{node.id}'",
+            )
+
+        if isinstance(node, ast.Attribute):
+            base = self._eval(node.value, context=context, run=run)
+            if not isinstance(base, dict):
+                raise RuleExpressionError(
+                    rule_id="unknown",
+                    expression=node.attr,
+                    message="Rule attribute access is only supported on context and run objects",
+                )
+            if node.attr not in base:
+                path = _attribute_path(node)
+                raise RuleInputError(path=path, message=f"Missing rule input '{path}'")
+            return base[node.attr]
+
+        if isinstance(node, ast.List):
+            return [self._eval(item, context=context, run=run) for item in node.elts]
+
+        if isinstance(node, ast.Tuple):
+            return tuple(self._eval(item, context=context, run=run) for item in node.elts)
+
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+            return not bool(self._eval(node.operand, context=context, run=run))
+
+        if isinstance(node, ast.BoolOp):
+            if isinstance(node.op, ast.And):
+                return all(bool(self._eval(value, context=context, run=run)) for value in node.values)
+            if isinstance(node.op, ast.Or):
+                return any(bool(self._eval(value, context=context, run=run)) for value in node.values)
+
+        if isinstance(node, ast.Compare):
+            left = self._eval(node.left, context=context, run=run)
+            for op, comparator in zip(node.ops, node.comparators, strict=False):
+                right = self._eval(comparator, context=context, run=run)
+                if not _compare_values(left=left, op=op, right=right):
+                    return False
+                left = right
+            return True
+
+        raise RuleExpressionError(
+            rule_id="unknown",
+            expression=node.__class__.__name__,
+            message="Unsupported rule expression",
+        )
+
+
+def evaluate_authorize_action(
+    payload: AuthorizeActionRequest,
+    *,
+    run_facts: RunFacts | None = None,
+) -> dict[str, Any]:
+    run_facts = run_facts or RunFacts(event_count=0, has_pending_approval=False)
+    context = payload.context.model_dump(mode="json", exclude_none=True)
+    run = {
+        "event_count": run_facts.event_count,
+        "has_pending_approval": run_facts.has_pending_approval,
+    }
+
+    rules = _RULES_REPOSITORY.rules_for_user(user_id=payload.context.user_id)
+
+    matched: list[MatchResult] = []
+    for rule in rules:
+        if payload.intent.action not in rule.applies_to:
+            continue
+        outcome = _RULE_EVALUATOR.evaluate(rule=rule, context=context, run=run)
+        if outcome:
+            matched.append(MatchResult(rule=rule, outcome=True))
+
+    if not matched:
+        state: AuthorizeActionState = "allow"
+        reason_code = "POLICY_ALLOW_NO_MATCH"
+    else:
+        winner = _winner_rule(matched)
+        state = _decision_state_for_action(winner.action)
+        reason_code = _reason_code_for_rule_action(winner.action)
+
     return {
         "decision_id": _build_deterministic_decision_id(payload=payload),
         "contract_version": AUTHORIZE_ACTION_CONTRACT_VERSION,
         "state": state,
-        "reason_code": _reason_code_for_state(state=state),
+        "reason_code": reason_code,
+        "matched_rule_ids": [item.rule.id for item in matched],
+        "matched_reasons": [item.rule.reason for item in matched],
     }
 
 
@@ -59,23 +317,150 @@ def _build_deterministic_decision_id(*, payload: AuthorizeActionRequest) -> str:
     return f"dec_{fingerprint[:16]}"
 
 
-def _reason_code_for_state(*, state: AuthorizeActionState) -> str:
-    mapping = {
-        "allow": "POLICY_ALLOW_WITHIN_THRESHOLD",
-        "requires_approval": "AMOUNT_ABOVE_THRESHOLD",
-        "deny": "POLICY_DENIED",
-    }
-    return mapping[state]
+def _winner_rule(matched: list[MatchResult]) -> RuleDefinition:
+    best = matched[0].rule
+    best_score = _action_priority(best.action)
+    for item in matched[1:]:
+        score = _action_priority(item.rule.action)
+        if score > best_score:
+            best = item.rule
+            best_score = score
+    return best
 
 
-def _configured_threshold_eur() -> float:
-    configured = os.getenv(_PURCHASE_APPROVAL_THRESHOLD_ENV)
-    if configured is None:
-        return _DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR
-    # Treat empty or invalid values as misconfiguration and fall back to default
-    try:
-        if configured.strip() == "":
-            return _DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR
-        return float(configured)
-    except ValueError:
-        return _DEFAULT_PURCHASE_APPROVAL_THRESHOLD_EUR
+def _action_priority(action: RuleAction) -> int:
+    if action == "deny":
+        return 3
+    if action == "require_approval":
+        return 2
+    return 1
+
+
+def _decision_state_for_action(action: RuleAction) -> AuthorizeActionState:
+    if action == "deny":
+        return "deny"
+    if action == "require_approval":
+        return "requires_approval"
+    return "allow"
+
+
+def _reason_code_for_rule_action(action: RuleAction) -> str:
+    if action == "deny":
+        return "RULE_DENY"
+    if action == "require_approval":
+        return "RULE_REQUIRE_APPROVAL"
+    return "RULE_ALLOW"
+
+
+def _parse_rules_catalog(raw: Any) -> dict[str, list[RuleDefinition]]:
+    if not isinstance(raw, dict):
+        raise RuleConfigurationError("Rule file root must be an object")
+
+    users = raw.get("users")
+    if not isinstance(users, dict):
+        raise RuleConfigurationError("Rule file must define object key 'users'")
+
+    parsed: dict[str, list[RuleDefinition]] = {}
+    for user_id, user_payload in users.items():
+        if not isinstance(user_id, str) or user_id.strip() == "":
+            raise RuleConfigurationError("Rule file contains invalid user id")
+        if not isinstance(user_payload, dict):
+            raise RuleConfigurationError(f"User '{user_id}' config must be an object")
+
+        rules = user_payload.get("rules")
+        if not isinstance(rules, list):
+            raise RuleConfigurationError(f"User '{user_id}' rules must be a list")
+
+        parsed_rules: list[RuleDefinition] = []
+        for index, rule in enumerate(rules):
+            if not isinstance(rule, dict):
+                raise RuleConfigurationError(
+                    f"User '{user_id}' rule at index {index} must be an object"
+                )
+            parsed_rules.append(_parse_rule_definition(user_id=user_id, index=index, rule=rule))
+
+        parsed[user_id.strip()] = parsed_rules
+
+    return parsed
+
+
+def _parse_rule_definition(*, user_id: str, index: int, rule: dict[str, Any]) -> RuleDefinition:
+    rule_id = rule.get("id")
+    if not isinstance(rule_id, str) or rule_id.strip() == "":
+        raise RuleConfigurationError(
+            f"User '{user_id}' rule at index {index} is missing non-empty 'id'"
+        )
+
+    rule_type = rule.get("type")
+    if not isinstance(rule_type, str) or rule_type.strip() == "":
+        raise RuleConfigurationError(f"Rule '{rule_id}' is missing non-empty 'type'")
+
+    applies_to = rule.get("applies_to")
+    if not isinstance(applies_to, list) or len(applies_to) == 0:
+        raise RuleConfigurationError(f"Rule '{rule_id}' requires non-empty list 'applies_to'")
+    applies_to_values = []
+    for action in applies_to:
+        if not isinstance(action, str) or action.strip() == "":
+            raise RuleConfigurationError(
+                f"Rule '{rule_id}' contains invalid applies_to action value"
+            )
+        applies_to_values.append(action.strip())
+
+    when = rule.get("when")
+    if not isinstance(when, str) or when.strip() == "":
+        raise RuleConfigurationError(f"Rule '{rule_id}' is missing non-empty 'when'")
+
+    action = rule.get("action")
+    if action not in {"allow", "require_approval", "deny"}:
+        raise RuleConfigurationError(
+            f"Rule '{rule_id}' has invalid action '{action}', expected allow|require_approval|deny"
+        )
+
+    reason = rule.get("reason")
+    if not isinstance(reason, str) or reason.strip() == "":
+        raise RuleConfigurationError(f"Rule '{rule_id}' is missing non-empty 'reason'")
+
+    return RuleDefinition(
+        id=rule_id.strip(),
+        type=rule_type.strip(),
+        applies_to=tuple(applies_to_values),
+        when=when.strip(),
+        action=action,
+        reason=reason.strip(),
+    )
+
+
+def _attribute_path(node: ast.Attribute) -> str:
+    parts: list[str] = []
+    current: ast.AST = node
+    while isinstance(current, ast.Attribute):
+        parts.append(current.attr)
+        current = current.value
+    if isinstance(current, ast.Name):
+        parts.append(current.id)
+    parts.reverse()
+    return ".".join(parts)
+
+
+def _compare_values(*, left: Any, op: ast.cmpop, right: Any) -> bool:
+    if isinstance(op, ast.Eq):
+        return left == right
+    if isinstance(op, ast.NotEq):
+        return left != right
+    if isinstance(op, ast.Gt):
+        return left > right
+    if isinstance(op, ast.GtE):
+        return left >= right
+    if isinstance(op, ast.Lt):
+        return left < right
+    if isinstance(op, ast.LtE):
+        return left <= right
+    if isinstance(op, ast.In):
+        return left in right
+    if isinstance(op, ast.NotIn):
+        return left not in right
+    raise RuleExpressionError(rule_id="unknown", expression="compare", message="Unsupported compare")
+
+
+_RULES_REPOSITORY = UserRulesRepository()
+_RULE_EVALUATOR = RuleEvaluator()

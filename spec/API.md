@@ -7,22 +7,22 @@ response envelopes, and endpoint-level behavior.
 
 Authorize an agent intent before an external side effect is executed.
 
-Behavior (issue #45 policy threshold v1):
+Behavior (multi-action user-local rules v2):
 
 - Valid payload: `200 OK`
 - Invalid payload: `422 Unprocessable Entity`
-- Supported action in v1 policy path: `purchase.create`
+- Supported actions: any non-empty `intent.action` string.
 - Policy inputs are required:
+  - `context.user_id` (string)
   - `context.amount` (numeric)
   - `context.currency` (`EUR`)
-- Configurable threshold (default): `100` EUR
-  - Environment override:
-    `NIGHTLEDGER_PURCHASE_APPROVAL_THRESHOLD_EUR`
-- Decision rule:
-  - `amount <= threshold` => `state=allow`
-  - `amount > threshold` => `state=requires_approval`
-- `context.transport_decision_hint` remains accepted for request-shape
-  compatibility, but policy evaluation is authoritative for final decision
+- User rule catalog source:
+  - `NIGHTLEDGER_USER_RULES_FILE` (YAML)
+- Decision semantics:
+  - matched `action=deny` => `state=deny`
+  - matched `action=require_approval` => `state=requires_approval`
+  - matched `action=allow` => `state=allow`
+  - no rule match => `state=allow`
 - Every successful decision includes deterministic `decision_id`.
 
 Request payload:
@@ -30,13 +30,13 @@ Request payload:
 ```json
 {
   "intent": {
-    "action": "purchase.create"
+    "action": "invoice.pay"
   },
   "context": {
+    "user_id": "user_123",
     "request_id": "req_123",
     "amount": 101,
-    "currency": "EUR",
-    "transport_decision_hint": "requires_approval"
+    "currency": "EUR"
   }
 }
 ```
@@ -96,10 +96,10 @@ Tool arguments:
     "action": "purchase.create"
   },
   "context": {
+    "user_id": "user_123",
     "request_id": "req_123",
     "amount": 100,
-    "currency": "EUR",
-    "transport_decision_hint": "allow"
+    "currency": "EUR"
   }
 }
 ```
@@ -111,19 +111,23 @@ Tool result (`tools/call`):
   - `contract_version`
   - `state`
   - `reason_code`
+  - `matched_rule_ids`
+  - `matched_reasons`
 - `isError=true` for invalid arguments, with a structured NightLedger error
   envelope in the response content and `structuredContent`.
 
 Success responses:
 
-`allow` (policy decision when amount is within threshold):
+`allow` (no matching rule):
 
 ```json
 {
   "decision_id": "dec_1d51e326dbd1e7f0",
-  "contract_version": "1.0.0",
+  "contract_version": "2.0.0",
   "state": "allow",
-  "reason_code": "POLICY_ALLOW_WITHIN_THRESHOLD"
+  "reason_code": "POLICY_ALLOW_NO_MATCH",
+  "matched_rule_ids": [],
+  "matched_reasons": []
 }
 ```
 
@@ -132,9 +136,11 @@ Success responses:
 ```json
 {
   "decision_id": "dec_8b43f6748da8bb2d",
-  "contract_version": "1.0.0",
+  "contract_version": "2.0.0",
   "state": "requires_approval",
-  "reason_code": "AMOUNT_ABOVE_THRESHOLD"
+  "reason_code": "RULE_REQUIRE_APPROVAL",
+  "matched_rule_ids": ["budget_monthly_cap"],
+  "matched_reasons": ["Monthly budget cap exceeded"]
 }
 ```
 
@@ -147,17 +153,17 @@ Request validation error response:
     "message": "authorize_action payload failed validation",
     "details": [
       {
-        "path": "intent.action",
-        "message": "Input should be 'purchase.create'",
-        "type": "literal_error",
-        "code": "UNSUPPORTED_ACTION"
+        "path": "context.user_id",
+        "message": "Field required",
+        "type": "missing",
+        "code": "MISSING_USER_ID"
       }
     ]
   }
 }
 ```
 
-Invalid decision hint example:
+Missing rule input example:
 
 ```json
 {
@@ -166,10 +172,10 @@ Invalid decision hint example:
     "message": "authorize_action payload failed validation",
     "details": [
       {
-        "path": "context.transport_decision_hint",
-        "message": "Input should be 'allow', 'requires_approval' or 'deny'",
-        "type": "literal_error",
-        "code": "INVALID_TRANSPORT_DECISION_HINT"
+        "path": "context.projected_monthly_spend",
+        "message": "Missing rule input 'context.projected_monthly_spend'",
+        "type": "missing",
+        "code": "MISSING_RULE_INPUT"
       }
     ]
   }
@@ -282,7 +288,7 @@ NightLedger treats `authorize_action` as a versioned product interface.
 Version marker:
 
 - Responses and tool metadata include `contract_version`.
-- Current marker: `1.0.0`.
+- Current marker: `2.0.0`.
 
 Compatibility rules:
 

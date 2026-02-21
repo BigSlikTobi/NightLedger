@@ -2338,3 +2338,45 @@ references and operationalizing branch hygiene in a non-destructive workflow.
 - Issue #62 process and hygiene residuals are now tracked with enforceable,
   auditable workflows.
 - Runtime API contracts remained unchanged in this closure pass.
+
+## 🗓️ 2026-02-20: Multi-action user-local authorize_action rule engine
+
+Implemented a breaking v2 authorization contract that replaces the global
+`purchase.create` threshold policy with a user-scoped, YAML-driven rule engine.
+The engine now evaluates arbitrary `intent.action` values against per-user
+rules from `NIGHTLEDGER_USER_RULES_FILE`, supports safe `when` expression
+parsing, exposes deterministic precedence (`deny > require_approval > allow`),
+and returns matched rule metadata in each decision (`matched_rule_ids`,
+`matched_reasons`).
+
+### What changed
+
+- Added user-local rule engine implementation in
+  `src/nightledger_api/services/authorize_action_service.py`.
+- Required `context.user_id` for `authorize_action` requests.
+- Added run-history facts (`run.event_count`, `run.has_pending_approval`) in
+  HTTP authorize path via `src/nightledger_api/controllers/events_controller.py`.
+- Added fail-loud rule errors and presenters:
+  `RULE_CONFIGURATION_ERROR`, `RULE_EXPRESSION_INVALID`,
+  and request-level `MISSING_RULE_INPUT`.
+- Updated MCP tool schema and metadata to v2 (`contract_version=2.0.0`,
+  compatibility marked as `breaking-change`).
+- Updated docs/specs for the v2 policy model:
+  `spec/API.md`, `spec/BUSINESS_RULES.md`, `spec/EVENT_SCHEMA.md`,
+  `docs/TECHNICAL_GUIDE.md`.
+- Updated test suite to use required `context.user_id` and to validate dynamic
+  rule behavior and fail-loud paths.
+
+### Validation
+
+- `./.venv/bin/pip install -r requirements.txt`
+- `./.venv/bin/pytest -q`
+- Result: `343 passed`
+
+### Key findings
+
+- Existing transport and execution-token flows remained stable after moving
+  policy logic to user-local rules once payload builders were updated with
+  `context.user_id`.
+- A strict AST validator initially rejected valid comparison operators;
+  allowing comparison-op AST nodes fixed evaluation while keeping the DSL safe.

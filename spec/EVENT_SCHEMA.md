@@ -85,3 +85,12 @@ Optional fields:
   }
 }
 ```
+
+## Related authorize_action v2 inputs (non-event payload)
+
+`POST /v1/mcp/authorize_action` is not an event-ingest payload, but governance
+depends on these required context fields:
+
+- `context.user_id`
+- `context.amount`
+- `context.currency`

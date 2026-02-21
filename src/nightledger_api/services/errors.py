@@ -163,3 +163,21 @@ class ExecutionPayloadMismatchError(ExecutionTokenError):
 class ExecutionTokenMisconfiguredError(ExecutionTokenError):
     def __init__(self, *, message: str) -> None:
         super().__init__(message)
+
+
+class RuleConfigurationError(Exception):
+    pass
+
+
+class RuleExpressionError(Exception):
+    def __init__(self, *, rule_id: str, expression: str, message: str) -> None:
+        self.rule_id = rule_id
+        self.expression = expression
+        super().__init__(message)
+
+
+class RuleInputError(Exception):
+    def __init__(self, *, path: str, message: str) -> None:
+        self.path = path
+        super().__init__(message)
+

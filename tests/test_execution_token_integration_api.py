@@ -25,6 +25,7 @@ def _authorize_payload(amount: int) -> dict[str, object]:
     return {
         "intent": {"action": "purchase.create"},
         "context": {
+            "user_id": "user_test",
             "request_id": f"req_{amount}",
             "amount": amount,
             "currency": "EUR",

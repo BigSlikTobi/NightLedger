@@ -92,7 +92,12 @@ def test_remote_mcp_tools_call_over_http_returns_deterministic_decision(
                 "name": "authorize_action",
                 "arguments": {
                     "intent": {"action": "purchase.create"},
-                    "context": {"request_id": "req_remote", "amount": 101, "currency": "EUR"},
+                    "context": {
+                        "user_id": "user_test",
+                        "request_id": "req_remote",
+                        "amount": 101,
+                        "currency": "EUR",
+                    },
                 },
             },
         },
@@ -102,7 +107,7 @@ def test_remote_mcp_tools_call_over_http_returns_deterministic_decision(
     body = response.json()
     assert body["id"] == 3
     assert body["result"]["structuredContent"]["state"] == "requires_approval"
-    assert body["result"]["structuredContent"]["reason_code"] == "AMOUNT_ABOVE_THRESHOLD"
+    assert body["result"]["structuredContent"]["reason_code"] == "RULE_REQUIRE_APPROVAL"
     assert "execution_token" not in body["result"]["structuredContent"]
 
 

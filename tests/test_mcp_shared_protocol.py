@@ -23,6 +23,7 @@ def test_shared_mcp_server_tools_call_returns_structured_decision() -> None:
                 "arguments": {
                     "intent": {"action": "purchase.create"},
                     "context": {
+                        "user_id": "user_test",
                         "request_id": "req_shared",
                         "amount": 101,
                         "currency": "EUR",
@@ -35,4 +36,4 @@ def test_shared_mcp_server_tools_call_returns_structured_decision() -> None:
     assert response is not None
     result = response["result"]
     assert result["structuredContent"]["state"] == "requires_approval"
-    assert result["structuredContent"]["reason_code"] == "AMOUNT_ABOVE_THRESHOLD"
+    assert result["structuredContent"]["reason_code"] == "RULE_REQUIRE_APPROVAL"
